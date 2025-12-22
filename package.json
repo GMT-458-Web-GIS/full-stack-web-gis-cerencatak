@@ -1,0 +1,26 @@
+{
+  "name": "full-stack-web-gis-cerencatak",
+  "version": "1.0.0",
+  "description": "[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/dxPbR2Gs)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GMT-458-Web-GIS/full-stack-web-gis-cerencatak.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/GMT-458-Web-GIS/full-stack-web-gis-cerencatak/issues"
+  },
+  "homepage": "https://github.com/GMT-458-Web-GIS/full-stack-web-gis-cerencatak#readme",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "pg": "^8.16.3"
+  }
+}
