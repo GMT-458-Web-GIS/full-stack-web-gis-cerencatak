@@ -1,1 +1,24 @@
-<h1>Student-Save</h1>
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student-Save | Kampüs Haritası</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        #map { height: 80vh; width: 100%; } /* Harita boyutu ekranın %80'i olsun */
+        body { font-family: sans-serif; margin: 0; padding: 0; }
+        header { background: #2c3e50; color: white; padding: 1rem; text-align: center; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Student-Save: Kampüs İndirim & Çalışma Alanları</h1>
+    </header>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/js/map.js"></script>
+</body>
+</html>
