@@ -10,64 +10,33 @@
     <style>
         /* Genel Stiller */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f7f6; overflow: hidden; }
-        header { background: #2c3e50; color: white; padding: 1rem; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        header { background: #2c3e50; color: white; padding: 1rem; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); position: relative; }
         
-        /* Filtreleme Barı */
-        #filter-bar {
-            background: white;
-            padding: 10px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            border-bottom: 2px solid #ddd;
-            z-index: 1000;
-            position: relative;
-        }
+        /* Kullanıcı Paneli (Sağ Üst) */
+        .auth-panel { position: absolute; top: 50%; right: 20px; transform: translateY(-50%); display: flex; gap: 10px; }
+        .btn-auth { padding: 8px 15px; border-radius: 6px; border: 1px solid white; background: transparent; color: white; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .btn-auth:hover { background: white; color: #2c3e50; }
 
-        #filter-bar select {
-            padding: 8px 12px;
-            border-radius: 6px;
-            border: 1px solid #ccc;
-            font-size: 0.9rem;
-            cursor: pointer;
-            outline: none;
-        }
+        /* Filtreleme Barı */
+        #filter-bar { background: white; padding: 10px 20px; display: flex; align-items: center; justify-content: center; gap: 15px; border-bottom: 2px solid #ddd; z-index: 1000; position: relative; }
+        #filter-bar select { padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.9rem; cursor: pointer; outline: none; }
 
         /* Harita Boyutu */
         #map { height: calc(100vh - 130px); width: 100%; z-index: 1; }
 
-        /* Modal (Açılır Pencere) Stilleri */
-        .modal-overlay {
-            display: none;
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6); z-index: 2000;
-            backdrop-filter: blur(3px);
-        }
-
-        .modal-box {
-            background: white; padding: 2rem; border-radius: 12px;
-            width: 90%; max-width: 450px;
-            position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-        }
-
-        .modal-box h2 { margin-top: 0; color: #2c3e50; font-size: 1.5rem; }
+        /* Modal Stilleri */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; backdrop-filter: blur(3px); }
+        .modal-box { background: white; padding: 2rem; border-radius: 12px; width: 90%; max-width: 450px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
+        .modal-box h2 { margin-top: 0; color: #2c3e50; font-size: 1.5rem; border-bottom: 2px solid #f4f7f6; padding-bottom: 10px; margin-bottom: 20px; }
 
         /* Form Elemanları */
-        .form-group { margin-bottom: 1.2rem; }
-        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: bold; color: #34495e; }
-        .form-group input, .form-group textarea, .form-group select { 
-            width: 100%; padding: 0.7rem; border: 1px solid #ddd; 
-            border-radius: 6px; box-sizing: border-box; font-size: 1rem;
-            outline: none;
-        }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.4rem; font-weight: bold; color: #34495e; font-size: 0.9rem; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 1rem; outline: none; transition: 0.3s; }
+        .form-group input:focus { border-color: #3498db; box-shadow: 0 0 5px rgba(52,152,219,0.3); }
         
-        .form-group input[type="file"] { border: none; padding: 0.5rem 0; }
-
         /* Butonlar */
-        .btn-group { display: flex; justify-content: flex-end; gap: 10px; margin-top: 1rem; }
+        .btn-group { display: flex; justify-content: flex-end; gap: 10px; margin-top: 1.5rem; }
         .btn-save { background: #27ae60; color: white; border: none; padding: 0.8rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; }
         .btn-save:hover { background: #219150; }
         .btn-cancel { background: #c0392b; color: white; border: none; padding: 0.8rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; }
@@ -78,6 +47,10 @@
 
     <header>
         <h1>Student-Save: Kampüs İndirim & Çalışma Alanları</h1>
+        <div class="auth-panel" id="authPanel">
+            <button class="btn-auth" onclick="openLoginModal()">Giriş Yap</button>
+            <button class="btn-auth" onclick="openRegisterModal()">Kayıt Ol</button>
+        </div>
     </header>
 
     <div id="filter-bar">
@@ -105,7 +78,6 @@
                     <label for="placeName">Mekan Adı:</label>
                     <input type="text" id="placeName" name="name" required placeholder="Örn: Beytepe Kütüphanesi">
                 </div>
-                
                 <div class="form-group">
                     <label for="category">Kategori:</label>
                     <select id="category" name="category" required>
@@ -119,23 +91,71 @@
                         <option value="idari">🏛️ İdari & Akademik</option>
                     </select>
                 </div>
-                
                 <div class="form-group">
                     <label for="placeDesc">Açıklama:</label>
                     <textarea id="placeDesc" name="description" rows="3" placeholder="Mekan hakkında kısa bilgi..."></textarea>
                 </div>
-                
                 <div class="form-group">
                     <label for="placeFile">Fotoğraf veya Video:</label>
                     <input type="file" id="placeFile" name="mediaFile" accept="image/*,video/*">
                 </div>
-                
                 <input type="hidden" id="clickedLat" name="lat">
                 <input type="hidden" id="clickedLng" name="lng">
-                
                 <div class="btn-group">
                     <button type="button" class="btn-cancel" onclick="closeModal()">İptal</button>
                     <button type="submit" class="btn-save">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="registerModal" class="modal-overlay">
+        <div class="modal-box">
+            <h2>🎓 Yeni Öğrenci Kaydı</h2>
+            <form id="registerForm">
+                <div class="form-group">
+                    <label>İsim:</label>
+                    <input type="text" name="firstName" required placeholder="Adınız">
+                </div>
+                <div class="form-group">
+                    <label>Soyisim:</label>
+                    <input type="text" name="lastName" required placeholder="Soyadınız">
+                </div>
+                <div class="form-group">
+                    <label>Öğrenci Numarası (ID):</label>
+                    <input type="text" name="studentId" required placeholder="Örn: 22105XXX">
+                </div>
+                <div class="form-group">
+                    <label>E-posta:</label>
+                    <input type="email" name="email" required placeholder="isim@hacettepe.edu.tr">
+                </div>
+                <div class="form-group">
+                    <label>Şifre:</label>
+                    <input type="password" name="password" required placeholder="********">
+                </div>
+                <div class="btn-group">
+                    <button type="button" class="btn-cancel" onclick="closeRegisterModal()">Vazgeç</button>
+                    <button type="submit" class="btn-save">Kayıt Ol</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="loginModal" class="modal-overlay">
+        <div class="modal-box">
+            <h2>🔑 Öğrenci Girişi</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label>E-posta veya Öğrenci ID:</label>
+                    <input type="text" name="loginId" required>
+                </div>
+                <div class="form-group">
+                    <label>Şifre:</label>
+                    <input type="password" name="password" required>
+                </div>
+                <div class="btn-group">
+                    <button type="button" class="btn-cancel" onclick="closeLoginModal()">Kapat</button>
+                    <button type="submit" class="btn-save">Giriş Yap</button>
                 </div>
             </form>
         </div>
