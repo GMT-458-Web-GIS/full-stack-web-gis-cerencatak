@@ -30,18 +30,40 @@ const upload = multer({ dest: 'public/uploads/' });
 // --- 4. ROTALAR ---
 
 // Mekanları Getir
+// Mekanları ve Yorumları Getir (Gelişmiş Sorgu)
 app.get('/api/places', async (req, res) => {
     try {
-        const result = await pool.query(`
-            SELECT id, name, description, type, media_url, user_id,
-            to_char(created_at, 'DD.MM.YYYY HH24:MI') as formatted_time,
-            ST_AsGeoJSON(geom)::json as geometry 
-            FROM places ORDER BY created_at DESC
-        `);
+        // app.js içinde GET /api/places rotasındaki SQL sorgusu:
+
+          const query = `
+              SELECT p.id, p.name, p.description, p.type, p.media_url, p.user_id,
+              to_char(p.created_at, 'DD.MM.YYYY HH24:MI') as formatted_time,
+              ST_AsGeoJSON(p.geom)::json as geometry,
+              
+              -- DÜZELTME BURADA: '[]' yerine '[]'::json yazdık 👇
+              COALESCE(
+                  json_agg(
+                      json_build_object(
+                          'text', c.comment_text,
+                          'sender', u.first_name,
+                          'avatar', u.profile_pic
+                      ) ORDER BY c.created_at ASC
+                  ) FILTER (WHERE c.id IS NOT NULL),
+                  '[]'::json
+              ) as comments
+
+              FROM places p
+              LEFT JOIN comments c ON p.id = c.place_id
+              LEFT JOIN users u ON c.user_id = u.id
+              GROUP BY p.id
+              ORDER BY p.created_at DESC
+          `;
+        
+        const result = await pool.query(query);
         res.json(result.rows);
     } catch (err) {
         console.error(err);
-        res.status(500).send('Hata');
+        res.status(500).send('Veri çekme hatası');
     }
 });
 
@@ -177,5 +199,25 @@ app.get('/api/logout', (req, res) => { req.session.destroy(); res.json({ success
 setInterval(async () => {
     await pool.query("DELETE FROM places WHERE created_at < NOW() - INTERVAL '24 hours'");
 }, 60 * 60 * 1000);
+
+// Yorum Yapma API'si
+app.post('/api/comments', async (req, res) => {
+    const { placeId, text } = req.body;
+    const userId = req.session.userId;
+
+    if (!userId) return res.status(401).json({ success: false, error: "Giriş yapmalısın." });
+    if (!text || text.trim() === "") return res.status(400).json({ success: false, error: "Boş yorum olmaz." });
+
+    try {
+        await pool.query(
+            "INSERT INTO comments (place_id, user_id, comment_text) VALUES ($1, $2, $3)",
+            [placeId, userId, text]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, error: "Yorum eklenemedi." });
+    }
+});
 
 app.listen(port, () => console.log(`Sunucu http://localhost:${port} adresinde hazır!`));

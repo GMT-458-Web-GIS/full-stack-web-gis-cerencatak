@@ -36,7 +36,7 @@ function showToast(message, type = 'success') {
     setTimeout(() => { toast.className = 'toast-notification'; }, 3000);
 }
 
-// --- 4. AKIŞ VE SİLME BUTONU ---
+// --- 4. AKIŞ, YORUMLAR VE SİLME ---
 function renderFeed(places) {
     const feedContainer = document.getElementById('feedContent');
     feedContainer.innerHTML = ''; 
@@ -50,18 +50,41 @@ function renderFeed(places) {
         const category = place.type || 'diger';
         const time = place.formatted_time || 'Az önce';
         
-        // SİLME BUTONU MANTIĞI:
-        // Eğer giriş yapmışsak VE (Kullanıcı Adminse VEYA Mekan bizimse)
+        // --- GÜVENLİK YAMASI: Yorumları Kontrol Et ---
+        let commentsList = place.comments;
+        if (typeof commentsList === 'string') {
+            try { commentsList = JSON.parse(commentsList); } 
+            catch (e) { commentsList = []; }
+        } else if (!Array.isArray(commentsList)) {
+            commentsList = [];
+        }
+
+        // --- SİLME BUTONU KONTROLÜ ---
         let deleteBtn = '';
         if (currentUser && (currentUser.isAdmin || currentUser.userId === place.user_id)) {
-            deleteBtn = `<button class="btn-delete" onclick="deletePlace(${place.id}, event)" title="Sil">
-                            <i class="fa-solid fa-trash"></i>
-                         </button>`;
+            deleteBtn = `<button class="btn-delete" onclick="deletePlace(${place.id}, event)" title="Sil"><i class="fa-solid fa-trash"></i></button>`;
+        }
+
+        // --- YORUMLARI HTML'E ÇEVİR ---
+        let commentsHtml = '';
+        if(commentsList.length > 0) {
+            commentsList.forEach(c => {
+                const avatar = c.avatar || `https://ui-avatars.com/api/?name=${c.sender}&background=random&size=24`;
+                commentsHtml += `
+                    <div class="comment-item">
+                        <img src="${avatar}" class="comment-avatar">
+                        <div>
+                            <span class="comment-user">${c.sender}</span>
+                            <span class="comment-text">${c.text}</span>
+                        </div>
+                    </div>
+                `;
+            });
         }
 
         const card = document.createElement('div');
         card.className = 'feed-card';
-        card.style.position = 'relative'; // Silme butonu için
+        card.style.position = 'relative'; 
         card.innerHTML = `
             ${deleteBtn}
             <div class="card-icon">
@@ -74,17 +97,25 @@ function renderFeed(places) {
                 <h4 style="margin:0 0 5px 0; color:#c0392b;">${place.name}</h4>
                 <p class="card-text">${place.description}</p>
                 ${place.media_url ? `<img src="${place.media_url}" class="card-image">` : ''}
+                
+                <div class="comments-section">
+                    ${commentsHtml}
+                </div>
+                
+                <form onsubmit="postComment(${place.id}, event)" class="comment-form">
+                    <input type="text" name="commentText" placeholder="Yorum yaz..." autocomplete="off">
+                    <button type="submit"><i class="fa-regular fa-paper-plane"></i></button>
+                </form>
+
                 <div class="card-footer">
-                    <span><i class="fa-regular fa-comment"></i> Yorum Yap</span>
-                    <span><i class="fa-solid fa-share"></i> Git</span>
+                    <span><i class="fa-solid fa-location-arrow"></i> Haritada Git</span>
                 </div>
             </div>
         `;
         
-        // Karta tıklayınca git (Silme butonuna basınca gitmesin diye event kontrolü gerekir ama basit tutuyoruz)
+        // Tıklama olayları (Butonlara tıklayınca haritaya gitmesin)
         card.addEventListener('click', (e) => {
-            // Eğer tıklanan şey silme butonu değilse git
-            if (!e.target.closest('.btn-delete')) {
+            if (!e.target.closest('.btn-delete') && !e.target.closest('.comment-form') && !e.target.tagName.match(/INPUT|BUTTON/)) {
                 map.flyTo([place.geometry.coordinates[1], place.geometry.coordinates[0]], 17);
                 place.marker.openPopup();
             }
@@ -94,13 +125,33 @@ function renderFeed(places) {
     });
 }
 
-function getIconUrl(type) {
-    return icons[type] ? icons[type].options.iconUrl : icons['diger'].options.iconUrl;
+// YORUM GÖNDERME FONKSİYONU
+function postComment(placeId, event) {
+    event.preventDefault();
+    event.stopPropagation(); // Kart tıklamasını engelle
+
+    const input = event.target.commentText;
+    const text = input.value;
+
+    fetch('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ placeId, text })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) {
+            input.value = ''; // Kutuyu temizle
+            loadPlaces(); // Yorumu görmek için listeyi yenile
+        } else {
+            showToast(data.error || "Giriş yapmalısın!", "error");
+        }
+    });
 }
 
 // SİLME FONKSİYONU
 function deletePlace(id, event) {
-    event.stopPropagation(); // Karta tıklamayı engelle
+    event.stopPropagation();
     if(!confirm("Bu gönderiyi silmek istediğine emin misin?")) return;
 
     fetch(`/api/places/${id}`, { method: 'DELETE' })
@@ -108,11 +159,15 @@ function deletePlace(id, event) {
     .then(data => {
         if(data.success) {
             showToast("Gönderi silindi 🗑️", "success");
-            loadPlaces(); // Listeyi yenile
+            loadPlaces();
         } else {
             showToast("Hata: " + data.error, "error");
         }
     });
+}
+
+function getIconUrl(type) {
+    return icons[type] ? icons[type].options.iconUrl : icons['diger'].options.iconUrl;
 }
 
 // --- 5. VERİLERİ YÜKLE ---
@@ -135,8 +190,6 @@ function loadPlaces() {
             allPlaces.push({ ...place, marker: marker, category: category });
         });
 
-        // Kullanıcı verisi geldikten sonra feed'i render et
-        // (Eğer currentUser null ise butonlar görünmez, auth check sonrası tekrar render ederiz)
         renderFeed(allPlaces);
       });
 }
@@ -187,7 +240,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
             updateUserStatus(true, d);
             showPanel('defaultAction');
             showToast(`Hoş geldin, ${d.userName}! 👋`);
-            loadPlaces(); // Giriş yapınca silme butonlarını görmek için listeyi yenile
+            loadPlaces(); 
         } else { showToast(d.error, "error"); }
     });
 });
@@ -201,7 +254,6 @@ document.getElementById('registerForm').addEventListener('submit', function(e) {
     });
 });
 
-// Profil Resmi Değiştirme
 const avatarInput = document.getElementById('updateAvatarInput');
 if(avatarInput) {
     avatarInput.addEventListener('change', function() {
@@ -224,11 +276,11 @@ function updateUserStatus(loggedIn, userData) {
         currentUser = userData;
         const avatarUrl = userData.profilePic ? userData.profilePic : `https://ui-avatars.com/api/?name=${userData.userName}&background=random`;
         container.innerHTML = `<button onclick="openProfile()"><img src="${avatarUrl}" class="user-avatar" style="object-fit:cover;">${userData.userName}</button>`;
-        renderFeed(allPlaces); // Admin girişi yapıldıysa butonları göstermek için tekrar render et
+        renderFeed(allPlaces); 
     } else {
         currentUser = null;
         container.innerHTML = `<button onclick="showPanel('loginPanel')">Giriş Yap</button>`;
-        renderFeed(allPlaces); // Çıkış yapıldıysa butonları gizle
+        renderFeed(allPlaces); 
     }
 }
 
@@ -236,31 +288,36 @@ function openProfile() {
     if(!currentUser) return;
     document.getElementById('profileName').textContent = currentUser.userName;
     const avatarUrl = currentUser.profilePic ? currentUser.profilePic : `https://ui-avatars.com/api/?name=${currentUser.userName}&background=random&size=128`;
-    document.getElementById('profileAvatar').src = avatarUrl;
-    
+    const avatarImg = document.getElementById('profileAvatar');
+    avatarImg.src = avatarUrl;
+    avatarImg.style.objectFit = "cover";
+
     const myPlaces = allPlaces.filter(p => p.user_id === currentUser.userId);
     document.getElementById('myPostCount').textContent = myPlaces.length;
     
     const myFeed = document.getElementById('myFeedContent');
     myFeed.innerHTML = '';
     
-    // Profildeki "Kendi Gönderilerim" listesinde de silme butonu olsun
-    myPlaces.forEach(place => {
-        const div = document.createElement('div');
-        div.className = 'feed-card';
-        div.style.padding = "10px";
-        div.style.position = "relative";
-        div.innerHTML = `
-            <button class="btn-delete" onclick="deletePlace(${place.id}, event)" title="Sil" style="top:5px; right:5px;">
-                <i class="fa-solid fa-trash"></i>
-            </button>
-            <div class="card-icon" style="width:35px; height:35px; font-size:1rem;"><img src="${getIconUrl(place.type)}" style="height:20px;"></div>
-            <div class="card-content">
-                <h4 style="margin:0; font-size:0.95rem;">${place.name}</h4>
-                <small style="color:#666;">${place.formatted_time}</small>
-            </div>`;
-        myFeed.appendChild(div);
-    });
+    if(myPlaces.length === 0) {
+        myFeed.innerHTML = '<p style="text-align:center; color:#999; font-size:0.9rem; padding:10px;">Henüz bir paylaşımın yok.</p>';
+    } else {
+        myPlaces.forEach(place => {
+            const div = document.createElement('div');
+            div.className = 'feed-card';
+            div.style.padding = "10px";
+            div.style.position = "relative";
+            div.innerHTML = `
+                <button class="btn-delete" onclick="deletePlace(${place.id}, event)" title="Sil" style="top:5px; right:5px;">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+                <div class="card-icon" style="width:35px; height:35px; font-size:1rem;"><img src="${getIconUrl(place.type)}" style="height:20px;"></div>
+                <div class="card-content">
+                    <h4 style="margin:0; font-size:0.95rem;">${place.name}</h4>
+                    <small style="color:#666;">${place.formatted_time}</small>
+                </div>`;
+            myFeed.appendChild(div);
+        });
+    }
     showPanel('profilePanel');
 }
 

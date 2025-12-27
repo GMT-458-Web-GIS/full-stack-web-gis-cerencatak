@@ -258,3 +258,47 @@ body {
     opacity: 1;
     transform: scale(1.1);
 }
+
+/* --- YORUM ALANI STİLLERİ --- */
+.comments-section {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+    font-size: 0.9rem;
+}
+
+.comment-item {
+    display: flex; gap: 8px; margin-bottom: 8px;
+    align-items: flex-start;
+}
+
+.comment-avatar {
+    width: 24px; height: 24px; border-radius: 50%; object-fit: cover;
+}
+
+.comment-user {
+    font-weight: 700; font-size: 0.85rem; margin-right: 5px; color: #333;
+}
+
+.comment-text {
+    color: #555;
+}
+
+/* Yorum Formu */
+.comment-form {
+    display: flex; gap: 5px; margin-top: 10px;
+}
+
+.comment-form input {
+    flex: 1; padding: 8px 12px; margin: 0;
+    border: 1px solid #ddd; border-radius: 20px;
+    font-size: 0.9rem; background: #f8f9fa;
+}
+
+.comment-form button {
+    background: white; border: 1px solid #ddd;
+    color: var(--primary); border-radius: 50%;
+    width: 35px; height: 35px; cursor: pointer;
+    transition: 0.2s;
+}
+.comment-form button:hover { background: var(--primary); color: white; border-color: var(--primary); }
