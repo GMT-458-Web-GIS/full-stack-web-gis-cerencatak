@@ -19,8 +19,11 @@
   },
   "homepage": "https://github.com/GMT-458-Web-GIS/full-stack-web-gis-cerencatak#readme",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "express-session": "^1.18.2",
+    "multer": "^2.0.2",
     "pg": "^8.16.3"
   }
 }
