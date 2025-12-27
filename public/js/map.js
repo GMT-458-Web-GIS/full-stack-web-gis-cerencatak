@@ -1,235 +1,272 @@
-/// 1. Haritayı Beytepe Kampüsü'ne odakla
+// --- 1. HARİTA AYARLARI ---
 var map = L.map('map').setView([39.8667, 32.7347], 15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap'
-}).addTo(map);
+var markersLayer = L.layerGroup().addTo(map);
+var allPlaces = []; 
+let currentUser = null; 
 
-// 2. Kategori Bazlı İkon Tanımlamaları
+// --- 2. İKONLAR ---
 const icons = {
     yemek: L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', iconSize: [25, 41], iconAnchor: [12, 41] }),
     calisma: L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png', iconSize: [25, 41], iconAnchor: [12, 41] }),
-    indirim: L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png', iconSize: [25, 41], iconAnchor: [12, 41] }),
     ulasim: L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png', iconSize: [25, 41], iconAnchor: [12, 41] }),
     sosyal: L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png', iconSize: [25, 41], iconAnchor: [12, 41] }),
-    saglik: L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', iconSize: [25, 41], iconAnchor: [12, 41] }),
-    hizmet: L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png', iconSize: [25, 41], iconAnchor: [12, 41] }),
-    idari: L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-black.png', iconSize: [25, 41], iconAnchor: [12, 41] })
+    indirim: L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png', iconSize: [25, 41], iconAnchor: [12, 41] }),
+    diger: L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png', iconSize: [25, 41], iconAnchor: [12, 41] })
 };
 
-// Global Marker Listesi (Filtreleme için)
-let allMarkers = [];
-
-// 3. HTML'deki Modal Elemanları
-const modal = document.getElementById('placeModal');
-const form = document.getElementById('placeForm');
-const latInput = document.getElementById('clickedLat');
-const lngInput = document.getElementById('clickedLng');
-
-function closeModal() {
-    modal.style.display = 'none';
-    form.reset(); 
+// --- 3. UI YÖNETİMİ ---
+function showPanel(panelId) {
+    ['defaultAction', 'addPlacePanel', 'loginPanel', 'registerPanel', 'profilePanel'].forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.style.display = 'none';
+    });
+    const panel = document.getElementById(panelId);
+    if(panel) {
+        panel.style.display = 'block';
+        if(panelId === 'addPlacePanel') document.getElementById('placeName').focus();
+    }
 }
 
-// 4. Haritaya Tıklama Olayı
-// map.js içindeki tıklama olayını korumaya alalım
-map.on('click', function(e) {
-    // Oturum kontrolü
-    fetch('/api/check-auth')
-        .then(res => res.json())
-        .then(data => {
-            if (data.loggedIn) {
-                latInput.value = e.latlng.lat;
-                lngInput.value = e.latlng.lng;
-                document.getElementById('placeModal').style.display = 'block';
-            } else {
-                alert("Mekan eklemek için lütfen öğrenci girişi yapın! 🎓");
-                openLoginModal();
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.className = `toast-notification show ${type}`;
+    setTimeout(() => { toast.className = 'toast-notification'; }, 3000);
+}
+
+// --- 4. AKIŞ VE SİLME BUTONU ---
+function renderFeed(places) {
+    const feedContainer = document.getElementById('feedContent');
+    feedContainer.innerHTML = ''; 
+
+    if(places.length === 0) {
+        feedContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Henüz hiç paylaşım yok. İlk sen ol! 👇</div>';
+        return;
+    }
+
+    places.forEach(place => {
+        const category = place.type || 'diger';
+        const time = place.formatted_time || 'Az önce';
+        
+        // SİLME BUTONU MANTIĞI:
+        // Eğer giriş yapmışsak VE (Kullanıcı Adminse VEYA Mekan bizimse)
+        let deleteBtn = '';
+        if (currentUser && (currentUser.isAdmin || currentUser.userId === place.user_id)) {
+            deleteBtn = `<button class="btn-delete" onclick="deletePlace(${place.id}, event)" title="Sil">
+                            <i class="fa-solid fa-trash"></i>
+                         </button>`;
+        }
+
+        const card = document.createElement('div');
+        card.className = 'feed-card';
+        card.style.position = 'relative'; // Silme butonu için
+        card.innerHTML = `
+            ${deleteBtn}
+            <div class="card-icon">
+                <img src="${getIconUrl(category)}" style="height:30px;">
+            </div>
+            <div class="card-content">
+                <div class="card-header">
+                    <span><strong>Mekan Bildirimi</strong> &bull; ${time}</span>
+                </div>
+                <h4 style="margin:0 0 5px 0; color:#c0392b;">${place.name}</h4>
+                <p class="card-text">${place.description}</p>
+                ${place.media_url ? `<img src="${place.media_url}" class="card-image">` : ''}
+                <div class="card-footer">
+                    <span><i class="fa-regular fa-comment"></i> Yorum Yap</span>
+                    <span><i class="fa-solid fa-share"></i> Git</span>
+                </div>
+            </div>
+        `;
+        
+        // Karta tıklayınca git (Silme butonuna basınca gitmesin diye event kontrolü gerekir ama basit tutuyoruz)
+        card.addEventListener('click', (e) => {
+            // Eğer tıklanan şey silme butonu değilse git
+            if (!e.target.closest('.btn-delete')) {
+                map.flyTo([place.geometry.coordinates[1], place.geometry.coordinates[0]], 17);
+                place.marker.openPopup();
             }
         });
-});
 
-// 5. Form Gönderildiğinde (Kaydet)
-form.addEventListener('submit', function(e) {
-    e.preventDefault();
+        feedContainer.appendChild(card);
+    });
+}
 
-    const formData = new FormData(form);
-    const category = document.getElementById('category').value;
+function getIconUrl(type) {
+    return icons[type] ? icons[type].options.iconUrl : icons['diger'].options.iconUrl;
+}
 
-    fetch('/api/places', {
-        method: 'POST',
-        body: formData 
-    })
+// SİLME FONKSİYONU
+function deletePlace(id, event) {
+    event.stopPropagation(); // Karta tıklamayı engelle
+    if(!confirm("Bu gönderiyi silmek istediğine emin misin?")) return;
+
+    fetch(`/api/places/${id}`, { method: 'DELETE' })
     .then(res => res.json())
     .then(data => {
         if(data.success) {
-            alert("Mekan başarıyla kaydedildi!");
-            
-            const name = document.getElementById('placeName').value;
-            const desc = document.getElementById('placeDesc').value;
-            const lat = latInput.value;
-            const lng = lngInput.value;
-
-            // Yeni marker oluştur ve listeye ekle
-            createMarker(name, desc, category, data.mediaUrl, [lat, lng]);
-
-            closeModal();
-        }
-    })
-    .catch(err => console.error("Hata:", err));
-});
-
-// 6. Marker Oluşturma Yardımcı Fonksiyonu
-function createMarker(name, description, category, mediaUrl, coords) {
-    let popupContent = `<b>${name}</b> <small>(${category})</small><br>${description}`;
-    
-    if (mediaUrl) {
-        if(mediaUrl.endsWith('.mp4') || mediaUrl.endsWith('.webm')) {
-            popupContent += `<br><video src="${mediaUrl}" width="200" controls style="margin-top:10px;"></video>`;
+            showToast("Gönderi silindi 🗑️", "success");
+            loadPlaces(); // Listeyi yenile
         } else {
-            popupContent += `<br><img src="${mediaUrl}" width="200" style="margin-top:10px; border-radius:5px;">`;
-        }
-    }
-
-    const marker = L.marker(coords, { icon: icons[category] || icons.idari })
-                    .addTo(map)
-                    .bindPopup(popupContent);
-    
-    // Filtreleme için sakla
-    allMarkers.push({ marker, category });
-}
-
-// 7. Filtreleme Fonksiyonu
-function filterMarkers() {
-    const selected = document.getElementById('filterCategory').value;
-    
-    allMarkers.forEach(item => {
-        if (selected === 'all' || item.category === selected) {
-            map.addLayer(item.marker);
-        } else {
-            map.removeLayer(item.marker);
+            showToast("Hata: " + data.error, "error");
         }
     });
 }
 
-// 8. Mevcut Mekanları Veritabanından Yükle
-
-// map.js içindeki loadPlaces fonksiyonu:
+// --- 5. VERİLERİ YÜKLE ---
 function loadPlaces() {
     fetch('/api/places')
       .then(res => res.json())
       .then(data => {
+        markersLayer.clearLayers();
+        allPlaces = [];
+        
         data.forEach(place => {
-            const coords = place.geometry.coordinates;
-            // Veritabanındaki sütun adımız 'type'
-            const category = place.type || 'diger'; 
+            const coords = [place.geometry.coordinates[1], place.geometry.coordinates[0]];
+            const category = place.type || 'diger';
+            const icon = icons[category] || icons['diger'];
             
-            createMarker(place.name, place.description, category, place.media_url, [coords[1], coords[0]]);
+            const marker = L.marker(coords, { icon: icon })
+                .bindPopup(`<b>${place.name}</b><br>${place.description}`);
+            
+            markersLayer.addLayer(marker);
+            allPlaces.push({ ...place, marker: marker, category: category });
         });
+
+        // Kullanıcı verisi geldikten sonra feed'i render et
+        // (Eğer currentUser null ise butonlar görünmez, auth check sonrası tekrar render ederiz)
+        renderFeed(allPlaces);
       });
 }
-// Uygulamayı başlat
-loadPlaces();
 
-// Kayıt Modalı Fonksiyonları
-function openRegisterModal() {
-    document.getElementById('registerModal').style.display = 'block';
+function filterFeed(category, btn) {
+    document.querySelectorAll('.story-item').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    markersLayer.clearLayers();
+    const filtered = category === 'all' ? allPlaces : allPlaces.filter(p => p.category === category);
+    filtered.forEach(p => markersLayer.addLayer(p.marker));
+    renderFeed(filtered);
 }
 
-function closeRegisterModal() {
-    document.getElementById('registerModal').style.display = 'none';
-    document.getElementById('registerForm').reset();
-}
-
-// Kayıt Formu Submit
-document.getElementById('registerForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(this);
-    const data = Object.fromEntries(formData.entries());
-
-    fetch('/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    })
-    .then(res => res.json())
-    .then(result => {
-        if(result.success) {
-            alert("Harika! Artık kayıtlı bir öğrencisin. Şimdi giriş yapabilirsin.");
-            closeRegisterModal();
+// --- 6. ETKİLEŞİMLER ---
+map.on('click', function(e) {
+    fetch('/api/check-auth').then(r => r.json()).then(data => {
+        if (data.loggedIn) {
+            document.getElementById('clickedLat').value = e.latlng.lat;
+            document.getElementById('clickedLng').value = e.latlng.lng;
+            showPanel('addPlacePanel');
+            showToast("Konum seçildi. Formu doldur! 👇", "success");
         } else {
-            alert("Hata: " + result.error);
-        }
-    })
-    .catch(err => console.error("Kayıt hatası:", err));
-});
-
-
-// --- map.js sonuna eklenecek Login ve UI yönetimi ---
-
-const authPanel = document.getElementById('authPanel');
-
-function openLoginModal() { document.getElementById('loginModal').style.display = 'block'; }
-function closeLoginModal() { document.getElementById('loginModal').style.display = 'none'; }
-
-// Giriş Formu Gönderme
-document.getElementById('loginForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const formData = new FormData(this);
-    const data = Object.fromEntries(formData.entries());
-
-    fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    })
-    .then(res => res.json())
-    .then(result => {
-        if(result.success) {
-            updateUI(true, result.userName);
-            closeLoginModal();
-        } else {
-            alert("Hata: " + result.error);
+            showToast("Önce giriş yapmalısın! 🔒", "error");
+            showPanel('loginPanel');
         }
     });
 });
 
-// Arayüzü Güncelle (Hoş geldin mesajı göster)
-function updateUI(loggedIn, userName) {
-    if (loggedIn) {
-        authPanel.innerHTML = `
-            <span style="color:white; margin-right:15px;">Hoş geldin, <b>${userName}</b>!</span>
-            <button class="btn-auth" onclick="logout()">Çıkış Yap</button>
-        `;
+document.getElementById('placeForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    if(!document.getElementById('clickedLat').value) { showToast("Lütfen haritada bir yere tıkla!", "error"); return; }
+    const formData = new FormData(this);
+    fetch('/api/places', { method: 'POST', body: formData }).then(r => r.json()).then(d => {
+        if(d.success) { 
+            showToast("Paylaşıldı 🎉"); 
+            showPanel('defaultAction'); 
+            this.reset(); 
+            loadPlaces(); 
+        } else { showToast("Hata: " + d.error, "error"); }
+    });
+});
+
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    fetch('/api/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(Object.fromEntries(new FormData(this))) })
+    .then(r => r.json()).then(d => {
+        if(d.success) {
+            updateUserStatus(true, d);
+            showPanel('defaultAction');
+            showToast(`Hoş geldin, ${d.userName}! 👋`);
+            loadPlaces(); // Giriş yapınca silme butonlarını görmek için listeyi yenile
+        } else { showToast(d.error, "error"); }
+    });
+});
+
+document.getElementById('registerForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    fetch('/api/register', { method: 'POST', body: new FormData(this) })
+    .then(r => r.json()).then(d => {
+        if(d.success) { showToast("Kayıt başarılı! Giriş yap.", "success"); showPanel('loginPanel'); } 
+        else { showToast(d.error, "error"); }
+    });
+});
+
+// Profil Resmi Değiştirme
+const avatarInput = document.getElementById('updateAvatarInput');
+if(avatarInput) {
+    avatarInput.addEventListener('change', function() {
+        if(this.files[0]) {
+            const fd = new FormData(); fd.append('profilePic', this.files[0]);
+            fetch('/api/update-avatar', { method: 'POST', body: fd }).then(r => r.json()).then(d => {
+                if(d.success) {
+                    if(currentUser) currentUser.profilePic = d.newUrl;
+                    updateUserStatus(true, currentUser);
+                    showToast("Güncellendi! 📸", "success");
+                }
+            });
+        }
+    });
+}
+
+function updateUserStatus(loggedIn, userData) {
+    const container = document.getElementById('userStatus');
+    if(loggedIn) {
+        currentUser = userData;
+        const avatarUrl = userData.profilePic ? userData.profilePic : `https://ui-avatars.com/api/?name=${userData.userName}&background=random`;
+        container.innerHTML = `<button onclick="openProfile()"><img src="${avatarUrl}" class="user-avatar" style="object-fit:cover;">${userData.userName}</button>`;
+        renderFeed(allPlaces); // Admin girişi yapıldıysa butonları göstermek için tekrar render et
     } else {
-        authPanel.innerHTML = `
-            <button class="btn-auth" onclick="openLoginModal()">Giriş Yap</button>
-            <button class="btn-auth" onclick="openRegisterModal()">Kayıt Ol</button>
-        `;
+        currentUser = null;
+        container.innerHTML = `<button onclick="showPanel('loginPanel')">Giriş Yap</button>`;
+        renderFeed(allPlaces); // Çıkış yapıldıysa butonları gizle
     }
 }
 
-// Çıkış Yapma Fonksiyonu
-function logout() {
-    fetch('/api/logout').then(() => {
-        window.location.reload(); // Sayfayı yenile ve oturumu kapat
+function openProfile() {
+    if(!currentUser) return;
+    document.getElementById('profileName').textContent = currentUser.userName;
+    const avatarUrl = currentUser.profilePic ? currentUser.profilePic : `https://ui-avatars.com/api/?name=${currentUser.userName}&background=random&size=128`;
+    document.getElementById('profileAvatar').src = avatarUrl;
+    
+    const myPlaces = allPlaces.filter(p => p.user_id === currentUser.userId);
+    document.getElementById('myPostCount').textContent = myPlaces.length;
+    
+    const myFeed = document.getElementById('myFeedContent');
+    myFeed.innerHTML = '';
+    
+    // Profildeki "Kendi Gönderilerim" listesinde de silme butonu olsun
+    myPlaces.forEach(place => {
+        const div = document.createElement('div');
+        div.className = 'feed-card';
+        div.style.padding = "10px";
+        div.style.position = "relative";
+        div.innerHTML = `
+            <button class="btn-delete" onclick="deletePlace(${place.id}, event)" title="Sil" style="top:5px; right:5px;">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+            <div class="card-icon" style="width:35px; height:35px; font-size:1rem;"><img src="${getIconUrl(place.type)}" style="height:20px;"></div>
+            <div class="card-content">
+                <h4 style="margin:0; font-size:0.95rem;">${place.name}</h4>
+                <small style="color:#666;">${place.formatted_time}</small>
+            </div>`;
+        myFeed.appendChild(div);
     });
+    showPanel('profilePanel');
 }
 
-// SAYFA YÜKLENDİĞİNDE: Oturumu kontrol et
-fetch('/api/check-auth')
-    .then(res => res.json())
-    .then(data => {
-        if (data.loggedIn) updateUI(true, data.userName);
-    });
+function logout() { fetch('/api/logout').then(() => window.location.reload()); }
 
-
-// Sayfa açıldığında oturum açık mı kontrol et
-fetch('/api/check-auth')
-    .then(res => res.json())
-    .then(data => {
-        if (data.loggedIn) {
-            updateUI(true, data.userName);
-        }
-    });    
+loadPlaces();
+fetch('/api/check-auth').then(r => r.json()).then(d => { 
+    updateUserStatus(d.loggedIn, d); 
+});
