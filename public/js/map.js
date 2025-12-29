@@ -60,14 +60,14 @@ function renderFeed(places) {
             commentsList = [];
         }
 
-        // --- BUTONLAR (SİLME VE DÜZENLEME) ---
-        // map.js içinde bu kısmı bul ve aşağıdaki ile değiştir:
-        // --- SİLME ve DÜZENLEME BUTONLARI ---
+       
+        // --- SİLME ve DÜZENLEME BUTONLARI (KESİN ÇÖZÜM) ---
         let actionBtns = '';
         if (currentUser && (currentUser.isAdmin || currentUser.userId === place.user_id)) {
-            // Artık stil yok, sadece class ismi var: "card-actions"
+            // Buraya dikkat: "flex-direction: column" komutunu doğrudan buraya yazdık.
+            // Bu komut, kutu içindeki elemanları (butonları) alt alta dizer.
             actionBtns = `
-            <div class="card-actions">
+            <div style="position:absolute; top:10px; right:10px; display:flex; flex-direction:column; gap:5px; z-index:100;">
                 <button class="btn-action btn-edit" onclick="editPlace(${place.id}, event)" title="Düzenle">
                     <i class="fa-solid fa-pen"></i>
                 </button>
