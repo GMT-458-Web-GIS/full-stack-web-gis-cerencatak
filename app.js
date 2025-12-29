@@ -120,6 +120,41 @@ app.delete('/api/places/:id', async (req, res) => {
     }
 });
 
+
+// --- app.js içine, DELETE bloğunun altına ekle ---
+
+// Mekan Güncelleme (EDİT)
+app.put('/api/places/:id', upload.none(), async (req, res) => {
+    const placeId = req.params.id;
+    const { name, description, category } = req.body;
+    const userId = req.session.userId;
+    const isAdmin = req.session.isAdmin;
+
+    if (!userId) return res.status(401).json({ success: false, error: "Oturum kapalı." });
+
+    try {
+        // Mekan kimin? Kontrol et.
+        const checkQuery = await pool.query("SELECT user_id FROM places WHERE id = $1", [placeId]);
+        if (checkQuery.rows.length === 0) return res.status(404).json({ success: false, error: "Mekan bulunamadı." });
+        
+        const postOwnerId = checkQuery.rows[0].user_id;
+        
+        // Admin veya Sahibi ise güncelle
+        if (isAdmin || postOwnerId === userId) {
+            await pool.query(
+                "UPDATE places SET name = $1, description = $2, type = $3 WHERE id = $4",
+                [name, description, category, placeId]
+            );
+            res.json({ success: true });
+        } else {
+            res.status(403).json({ success: false, error: "Yetkisiz işlem!" });
+        }
+    } catch (err) {
+        console.error("Güncelleme hatası:", err);
+        res.status(500).json({ success: false, error: "Sunucu hatası." });
+    }
+});
+
 // Kayıt Ol
 app.post('/api/register', upload.single('profilePic'), async (req, res) => {
     const { firstName, lastName, studentId, email, password } = req.body;

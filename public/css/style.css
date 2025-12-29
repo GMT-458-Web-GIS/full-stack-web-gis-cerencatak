@@ -302,3 +302,11 @@ body {
     transition: 0.2s;
 }
 .comment-form button:hover { background: var(--primary); color: white; border-color: var(--primary); }
+
+.btn-action {
+    background: white; border: none; cursor: pointer;
+    width: 30px; height: 30px; border-radius: 50%;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-size: 14px;
+}
+.btn-edit:hover { background: #3498db; color: white; }
+.btn-delete:hover { background: #e74c3c; color: white; }

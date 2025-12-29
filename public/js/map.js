@@ -5,6 +5,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:
 var markersLayer = L.layerGroup().addTo(map);
 var allPlaces = []; 
 let currentUser = null; 
+let editingPlaceId = null; // Düzenleme modu için değişken
 
 // --- 2. İKONLAR ---
 const icons = {
@@ -36,7 +37,7 @@ function showToast(message, type = 'success') {
     setTimeout(() => { toast.className = 'toast-notification'; }, 3000);
 }
 
-// --- 4. AKIŞ, YORUMLAR VE SİLME ---
+// --- 4. AKIŞ, YORUMLAR, DÜZENLEME VE SİLME ---
 function renderFeed(places) {
     const feedContainer = document.getElementById('feedContent');
     feedContainer.innerHTML = ''; 
@@ -50,7 +51,7 @@ function renderFeed(places) {
         const category = place.type || 'diger';
         const time = place.formatted_time || 'Az önce';
         
-        // --- GÜVENLİK YAMASI: Yorumları Kontrol Et ---
+        // Yorumları Güvenli Hale Getir
         let commentsList = place.comments;
         if (typeof commentsList === 'string') {
             try { commentsList = JSON.parse(commentsList); } 
@@ -59,13 +60,21 @@ function renderFeed(places) {
             commentsList = [];
         }
 
-        // --- SİLME BUTONU KONTROLÜ ---
-        let deleteBtn = '';
+        // --- BUTONLAR (SİLME VE DÜZENLEME) ---
+        let actionBtns = '';
         if (currentUser && (currentUser.isAdmin || currentUser.userId === place.user_id)) {
-            deleteBtn = `<button class="btn-delete" onclick="deletePlace(${place.id}, event)" title="Sil"><i class="fa-solid fa-trash"></i></button>`;
+            actionBtns = `
+            <div style="position:absolute; top:15px; right:15px; display:flex; gap:5px; z-index:5;">
+                <button class="btn-action btn-edit" onclick="editPlace(${place.id}, event)" title="Düzenle">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
+                <button class="btn-action btn-delete" onclick="deletePlace(${place.id}, event)" title="Sil">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>`;
         }
 
-        // --- YORUMLARI HTML'E ÇEVİR ---
+        // Yorum HTML'i
         let commentsHtml = '';
         if(commentsList.length > 0) {
             commentsList.forEach(c => {
@@ -86,7 +95,7 @@ function renderFeed(places) {
         card.className = 'feed-card';
         card.style.position = 'relative'; 
         card.innerHTML = `
-            ${deleteBtn}
+            ${actionBtns}
             <div class="card-icon">
                 <img src="${getIconUrl(category)}" style="height:30px;">
             </div>
@@ -115,7 +124,7 @@ function renderFeed(places) {
         
         // Tıklama olayları (Butonlara tıklayınca haritaya gitmesin)
         card.addEventListener('click', (e) => {
-            if (!e.target.closest('.btn-delete') && !e.target.closest('.comment-form') && !e.target.tagName.match(/INPUT|BUTTON/)) {
+            if (!e.target.closest('.btn-action') && !e.target.closest('.comment-form') && !e.target.tagName.match(/INPUT|BUTTON/)) {
                 map.flyTo([place.geometry.coordinates[1], place.geometry.coordinates[0]], 17);
                 place.marker.openPopup();
             }
@@ -125,10 +134,34 @@ function renderFeed(places) {
     });
 }
 
-// YORUM GÖNDERME FONKSİYONU
+// --- DÜZENLEME FONKSİYONU ---
+function editPlace(id, event) {
+    event.stopPropagation(); // Karta tıklamayı engelle
+    
+    const place = allPlaces.find(p => p.id === id);
+    if(!place) return;
+
+    // Formu doldur
+    document.getElementById('placeName').value = place.name;
+    document.getElementById('placeDesc').value = place.description;
+    document.getElementById('placeCategory').value = place.type || 'diger';
+    
+    // Koordinatları al (Hata vermemesi için)
+    document.getElementById('clickedLat').value = place.geometry.coordinates[1];
+    document.getElementById('clickedLng').value = place.geometry.coordinates[0];
+
+    // Düzenleme Moduna Geç
+    editingPlaceId = id;
+    document.querySelector('#addPlacePanel h3').textContent = "Mekanı Düzenle"; // Başlığı değiştir
+    document.querySelector('#placeForm button[type="submit"]').textContent = "Güncelle";
+    
+    showPanel('addPlacePanel');
+}
+
+// YORUM GÖNDERME
 function postComment(placeId, event) {
     event.preventDefault();
-    event.stopPropagation(); // Kart tıklamasını engelle
+    event.stopPropagation(); 
 
     const input = event.target.commentText;
     const text = input.value;
@@ -141,15 +174,15 @@ function postComment(placeId, event) {
     .then(res => res.json())
     .then(data => {
         if(data.success) {
-            input.value = ''; // Kutuyu temizle
-            loadPlaces(); // Yorumu görmek için listeyi yenile
+            input.value = ''; 
+            loadPlaces(); 
         } else {
             showToast(data.error || "Giriş yapmalısın!", "error");
         }
     });
 }
 
-// SİLME FONKSİYONU
+// SİLME
 function deletePlace(id, event) {
     event.stopPropagation();
     if(!confirm("Bu gönderiyi silmek istediğine emin misin?")) return;
@@ -203,10 +236,11 @@ function filterFeed(category, btn) {
     renderFeed(filtered);
 }
 
-// --- 6. ETKİLEŞİMLER ---
+// --- 6. ETKİLEŞİMLER VE FORM YÖNETİMİ ---
 map.on('click', function(e) {
     fetch('/api/check-auth').then(r => r.json()).then(data => {
         if (data.loggedIn) {
+            resetForm(); // Tıklayınca formu temizle (önceki düzenleme kalmasın)
             document.getElementById('clickedLat').value = e.latlng.lat;
             document.getElementById('clickedLng').value = e.latlng.lng;
             showPanel('addPlacePanel');
@@ -218,19 +252,53 @@ map.on('click', function(e) {
     });
 });
 
+// FORM GÖNDERME (POST ve PUT Ayırımı)
 document.getElementById('placeForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    if(!document.getElementById('clickedLat').value) { showToast("Lütfen haritada bir yere tıkla!", "error"); return; }
     const formData = new FormData(this);
-    fetch('/api/places', { method: 'POST', body: formData }).then(r => r.json()).then(d => {
-        if(d.success) { 
-            showToast("Paylaşıldı 🎉"); 
-            showPanel('defaultAction'); 
-            this.reset(); 
-            loadPlaces(); 
-        } else { showToast("Hata: " + d.error, "error"); }
-    });
+    
+    // EĞER DÜZENLEME MODUNDAYSAK (PUT)
+    if (editingPlaceId) {
+        fetch(`/api/places/${editingPlaceId}`, { 
+            method: 'PUT', 
+            body: formData 
+        })
+        .then(r => r.json())
+        .then(d => {
+            if(d.success) { 
+                showToast("Mekan Güncellendi! 📝"); 
+                resetForm(); // Formu sıfırla
+                loadPlaces(); 
+            } else { showToast("Hata: " + d.error, "error"); }
+        });
+    } 
+    // EĞER YENİ EKLEME MODUNDAYSAK (POST)
+    else {
+        if(!document.getElementById('clickedLat').value) { showToast("Lütfen haritada bir yere tıkla!", "error"); return; }
+        fetch('/api/places', { method: 'POST', body: formData })
+        .then(r => r.json()).then(d => {
+            if(d.success) { 
+                showToast("Paylaşıldı 🎉"); 
+                resetForm();
+                loadPlaces(); 
+            } else { showToast("Hata: " + d.error, "error"); }
+        });
+    }
 });
+
+// Formu temizleyen yardımcı fonksiyon
+function resetForm() {
+    document.getElementById('placeForm').reset();
+    editingPlaceId = null;
+    const titleEl = document.querySelector('#addPlacePanel h3');
+    const btnEl = document.querySelector('#placeForm button[type="submit"]');
+    
+    // Başlık ve butonu eski haline getir (HTML yapısına göre)
+    if(titleEl) titleEl.textContent = "Yeni Mekan Ekle";
+    if(btnEl) btnEl.textContent = "Paylaş";
+    
+    showPanel('defaultAction');
+}
 
 document.getElementById('loginForm').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -306,8 +374,10 @@ function openProfile() {
             div.className = 'feed-card';
             div.style.padding = "10px";
             div.style.position = "relative";
+            
+            // Profilde de silme butonu olsun
             div.innerHTML = `
-                <button class="btn-delete" onclick="deletePlace(${place.id}, event)" title="Sil" style="top:5px; right:5px;">
+                <button class="btn-action btn-delete" onclick="deletePlace(${place.id}, event)" title="Sil" style="position:absolute; top:5px; right:5px;">
                     <i class="fa-solid fa-trash"></i>
                 </button>
                 <div class="card-icon" style="width:35px; height:35px; font-size:1rem;"><img src="${getIconUrl(place.type)}" style="height:20px;"></div>
