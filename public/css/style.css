@@ -303,10 +303,27 @@ body {
 }
 .comment-form button:hover { background: var(--primary); color: white; border-color: var(--primary); }
 
+/* --- Butonlar (Güncel Hali) --- */
 .btn-action {
-    background: white; border: none; cursor: pointer;
-    width: 30px; height: 30px; border-radius: 50%;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-size: 14px;
+    background: white;
+    border: none;
+    cursor: pointer;
+    width: 32px; /* Biraz büyüttük */
+    height: 32px;
+    border-radius: 50%; /* Tam yuvarlak */
+    
+    /* İkonu tam merkeze hizalama sihri */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    font-size: 14px;
+    transition: all 0.2s ease; /* Yumuşak geçiş efekti */
 }
-.btn-edit:hover { background: #3498db; color: white; }
-.btn-delete:hover { background: #e74c3c; color: white; }
+
+.btn-edit { color: #3498db; } /* Mavi Kalem */
+.btn-edit:hover { background: #3498db; color: white; transform: scale(1.1); }
+
+.btn-delete { color: #e74c3c; } /* Kırmızı Çöp Kutusu */
+.btn-delete:hover { background: #e74c3c; color: white; transform: scale(1.1); }
