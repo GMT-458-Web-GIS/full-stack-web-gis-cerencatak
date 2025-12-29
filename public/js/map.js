@@ -350,14 +350,32 @@ if(avatarInput) {
 
 function updateUserStatus(loggedIn, userData) {
     const container = document.getElementById('userStatus');
+    const placeholderImg = document.getElementById('userAvatarPlaceholder'); // HTML'de eklediğimiz ID'yi bul
+
     if(loggedIn) {
         currentUser = userData;
+        // Profil resmi varsa onu kullan, yoksa isminin baş harflerini kullan
         const avatarUrl = userData.profilePic ? userData.profilePic : `https://ui-avatars.com/api/?name=${userData.userName}&background=random`;
+        
+        // 1. Sağ üstteki kullanıcı butonu
         container.innerHTML = `<button onclick="openProfile()"><img src="${avatarUrl}" class="user-avatar" style="object-fit:cover;">${userData.userName}</button>`;
+        
+        // 2. "Kampüste neler oluyor?" kısmındaki yuvarlak resim (Senin istediğin düzeltme)
+        if(placeholderImg) {
+            placeholderImg.src = avatarUrl;
+        }
+
         renderFeed(allPlaces); 
     } else {
         currentUser = null;
+        // Çıkış yapınca buton "Giriş Yap" olsun
         container.innerHTML = `<button onclick="showPanel('loginPanel')">Giriş Yap</button>`;
+        
+        // Çıkış yapınca resim tekrar "SE" (Sen) olsun
+        if(placeholderImg) {
+            placeholderImg.src = "https://ui-avatars.com/api/?name=Sen&background=random";
+        }
+
         renderFeed(allPlaces); 
     }
 }
