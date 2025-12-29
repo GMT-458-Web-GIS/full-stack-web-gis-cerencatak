@@ -61,29 +61,24 @@ function renderFeed(places) {
         }
 
        
-        // --- SİLME ve DÜZENLEME BUTONLARI (KESİN ÇÖZÜM V2) ---
+       // --- SİLME ve DÜZENLEME BUTONLARI (MANUEL KOORDİNAT YÖNTEMİ) ---
         let actionBtns = '';
         if (currentUser && (currentUser.isAdmin || currentUser.userId === place.user_id)) {
+            // position: relative !important; komutlarını sildik, yerine absolute koyduk.
+            // İkisine farklı "top" (üstten boşluk) değerleri verdik.
             actionBtns = `
-            <div style="
-                position: absolute; 
-                top: 15px; 
-                right: 15px; 
-                display: flex; 
-                flex-direction: column; /* Alt alta diz */
-                gap: 12px;              /* Aralarına net boşluk koy */
-                z-index: 999;           /* En üstte dursun */
-                pointer-events: auto;   /* Tıklamayı garantiye al */
-            ">
-                <button class="btn-action btn-edit" onclick="editPlace(${place.id}, event)" title="Düzenle" style="margin-bottom: 5px;">
+                <button class="btn-action btn-edit" onclick="editPlace(${place.id}, event)" title="Düzenle" 
+                    style="position:absolute !important; top:15px; right:15px; z-index:100;">
                     <i class="fa-solid fa-pen"></i>
                 </button>
-                <button class="btn-action btn-delete" onclick="deletePlace(${place.id}, event)" title="Sil">
+                
+                <button class="btn-action btn-delete" onclick="deletePlace(${place.id}, event)" title="Sil" 
+                    style="position:absolute !important; top:55px; right:15px; z-index:100;">
                     <i class="fa-solid fa-trash"></i>
                 </button>
-            </div>`;
+            `;
         }
-
+        
         // Yorum HTML'i
         let commentsHtml = '';
         if(commentsList.length > 0) {
