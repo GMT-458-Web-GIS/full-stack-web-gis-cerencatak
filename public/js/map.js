@@ -60,8 +60,7 @@ function renderFeed(places) {
             commentsList = [];
         }
 
-       
-       // --- SİLME ve DÜZENLEME BUTONLARI (MANUEL KOORDİNAT YÖNTEMİ) ---
+        // --- SİLME ve DÜZENLEME BUTONLARI (MANUEL KOORDİNAT YÖNTEMİ) ---
         let actionBtns = '';
         if (currentUser && (currentUser.isAdmin || currentUser.userId === place.user_id)) {
             // position: relative !important; komutlarını sildik, yerine absolute koyduk.
@@ -149,7 +148,10 @@ function editPlace(id, event) {
     // Formu doldur
     document.getElementById('placeName').value = place.name;
     document.getElementById('placeDesc').value = place.description;
-    document.getElementById('placeCategory').value = place.type || 'diger';
+    
+    // HTML'de ID'yi 'placeCategory' yaptık, artık bulabilir:
+    const catSelect = document.getElementById('placeCategory'); 
+    if(catSelect) catSelect.value = place.type || 'diger';
     
     // Koordinatları al (Hata vermemesi için)
     document.getElementById('clickedLat').value = place.geometry.coordinates[1];
@@ -157,8 +159,11 @@ function editPlace(id, event) {
 
     // Düzenleme Moduna Geç
     editingPlaceId = id;
-    document.querySelector('#addPlacePanel h3').textContent = "Mekanı Düzenle"; // Başlığı değiştir
-    document.querySelector('#placeForm button[type="submit"]').textContent = "Güncelle";
+    const titleEl = document.querySelector('#addPlacePanel h3');
+    const btnEl = document.querySelector('#placeForm button[type="submit"]');
+
+    if(titleEl) titleEl.textContent = "Mekanı Düzenle";
+    if(btnEl) btnEl.textContent = "Güncelle";
     
     showPanel('addPlacePanel');
 }
@@ -298,8 +303,8 @@ function resetForm() {
     const titleEl = document.querySelector('#addPlacePanel h3');
     const btnEl = document.querySelector('#placeForm button[type="submit"]');
     
-    // Başlık ve butonu eski haline getir (HTML yapısına göre)
-    if(titleEl) titleEl.textContent = "Yeni Mekan Ekle";
+    // Başlık ve butonu eski haline getir
+    if(titleEl) titleEl.textContent = "📍 Yer Bildirimi"; // HTML'deki başlık ile aynı yaptık
     if(btnEl) btnEl.textContent = "Paylaş";
     
     showPanel('defaultAction');
@@ -380,7 +385,7 @@ function openProfile() {
             div.style.padding = "10px";
             div.style.position = "relative";
             
-            // Profilde de silme butonu olsun
+            // Profilde de silme butonu olsun (Manuel koordinatlı)
             div.innerHTML = `
                 <button class="btn-action btn-delete" onclick="deletePlace(${place.id}, event)" title="Sil" style="position:absolute; top:5px; right:5px;">
                     <i class="fa-solid fa-trash"></i>
