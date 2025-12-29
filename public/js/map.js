@@ -5,7 +5,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:
 var markersLayer = L.layerGroup().addTo(map);
 var allPlaces = []; 
 let currentUser = null; 
-let editingPlaceId = null; // Düzenleme modu için değişken
+let editingPlaceId = null; 
 
 // --- 2. İKONLAR ---
 const icons = {
@@ -51,7 +51,6 @@ function renderFeed(places) {
         const category = place.type || 'diger';
         const time = place.formatted_time || 'Az önce';
         
-        // Yorumları Güvenli Hale Getir
         let commentsList = place.comments;
         if (typeof commentsList === 'string') {
             try { commentsList = JSON.parse(commentsList); } 
@@ -60,17 +59,13 @@ function renderFeed(places) {
             commentsList = [];
         }
 
-        // --- SİLME ve DÜZENLEME BUTONLARI (MANUEL KOORDİNAT YÖNTEMİ) ---
         let actionBtns = '';
         if (currentUser && (currentUser.isAdmin || currentUser.userId === place.user_id)) {
-            // position: relative !important; komutlarını sildik, yerine absolute koyduk.
-            // İkisine farklı "top" (üstten boşluk) değerleri verdik.
             actionBtns = `
                 <button class="btn-action btn-edit" onclick="editPlace(${place.id}, event)" title="Düzenle" 
                     style="position:absolute !important; top:15px; right:15px; z-index:100;">
                     <i class="fa-solid fa-pen"></i>
                 </button>
-                
                 <button class="btn-action btn-delete" onclick="deletePlace(${place.id}, event)" title="Sil" 
                     style="position:absolute !important; top:55px; right:15px; z-index:100;">
                     <i class="fa-solid fa-trash"></i>
@@ -78,7 +73,6 @@ function renderFeed(places) {
             `;
         }
         
-        // Yorum HTML'i
         let commentsHtml = '';
         if(commentsList.length > 0) {
             commentsList.forEach(c => {
@@ -126,7 +120,6 @@ function renderFeed(places) {
             </div>
         `;
         
-        // Tıklama olayları (Butonlara tıklayınca haritaya gitmesin)
         card.addEventListener('click', (e) => {
             if (!e.target.closest('.btn-action') && !e.target.closest('.comment-form') && !e.target.tagName.match(/INPUT|BUTTON/)) {
                 map.flyTo([place.geometry.coordinates[1], place.geometry.coordinates[0]], 17);
@@ -138,26 +131,19 @@ function renderFeed(places) {
     });
 }
 
-// --- DÜZENLEME FONKSİYONU ---
 function editPlace(id, event) {
-    event.stopPropagation(); // Karta tıklamayı engelle
-    
+    event.stopPropagation();
     const place = allPlaces.find(p => p.id === id);
     if(!place) return;
 
-    // Formu doldur
     document.getElementById('placeName').value = place.name;
     document.getElementById('placeDesc').value = place.description;
-    
-    // HTML'de ID'yi 'placeCategory' yaptık, artık bulabilir:
     const catSelect = document.getElementById('placeCategory'); 
     if(catSelect) catSelect.value = place.type || 'diger';
     
-    // Koordinatları al (Hata vermemesi için)
     document.getElementById('clickedLat').value = place.geometry.coordinates[1];
     document.getElementById('clickedLng').value = place.geometry.coordinates[0];
 
-    // Düzenleme Moduna Geç
     editingPlaceId = id;
     const titleEl = document.querySelector('#addPlacePanel h3');
     const btnEl = document.querySelector('#placeForm button[type="submit"]');
@@ -168,11 +154,9 @@ function editPlace(id, event) {
     showPanel('addPlacePanel');
 }
 
-// YORUM GÖNDERME
 function postComment(placeId, event) {
     event.preventDefault();
     event.stopPropagation(); 
-
     const input = event.target.commentText;
     const text = input.value;
 
@@ -192,7 +176,6 @@ function postComment(placeId, event) {
     });
 }
 
-// SİLME
 function deletePlace(id, event) {
     event.stopPropagation();
     if(!confirm("Bu gönderiyi silmek istediğine emin misin?")) return;
@@ -213,26 +196,21 @@ function getIconUrl(type) {
     return icons[type] ? icons[type].options.iconUrl : icons['diger'].options.iconUrl;
 }
 
-// --- 5. VERİLERİ YÜKLE ---
 function loadPlaces() {
     fetch('/api/places')
       .then(res => res.json())
       .then(data => {
         markersLayer.clearLayers();
         allPlaces = [];
-        
         data.forEach(place => {
             const coords = [place.geometry.coordinates[1], place.geometry.coordinates[0]];
             const category = place.type || 'diger';
             const icon = icons[category] || icons['diger'];
-            
             const marker = L.marker(coords, { icon: icon })
                 .bindPopup(`<b>${place.name}</b><br>${place.description}`);
-            
             markersLayer.addLayer(marker);
             allPlaces.push({ ...place, marker: marker, category: category });
         });
-
         renderFeed(allPlaces);
       });
 }
@@ -246,11 +224,10 @@ function filterFeed(category, btn) {
     renderFeed(filtered);
 }
 
-// --- 6. ETKİLEŞİMLER VE FORM YÖNETİMİ ---
 map.on('click', function(e) {
     fetch('/api/check-auth').then(r => r.json()).then(data => {
         if (data.loggedIn) {
-            resetForm(); // Tıklayınca formu temizle (önceki düzenleme kalmasın)
+            resetForm(); 
             document.getElementById('clickedLat').value = e.latlng.lat;
             document.getElementById('clickedLng').value = e.latlng.lng;
             showPanel('addPlacePanel');
@@ -262,28 +239,19 @@ map.on('click', function(e) {
     });
 });
 
-// FORM GÖNDERME (POST ve PUT Ayırımı)
 document.getElementById('placeForm').addEventListener('submit', function(e) {
     e.preventDefault();
     const formData = new FormData(this);
-    
-    // EĞER DÜZENLEME MODUNDAYSAK (PUT)
     if (editingPlaceId) {
-        fetch(`/api/places/${editingPlaceId}`, { 
-            method: 'PUT', 
-            body: formData 
-        })
-        .then(r => r.json())
-        .then(d => {
+        fetch(`/api/places/${editingPlaceId}`, { method: 'PUT', body: formData })
+        .then(r => r.json()).then(d => {
             if(d.success) { 
                 showToast("Mekan Güncellendi! 📝"); 
-                resetForm(); // Formu sıfırla
+                resetForm(); 
                 loadPlaces(); 
             } else { showToast("Hata: " + d.error, "error"); }
         });
-    } 
-    // EĞER YENİ EKLEME MODUNDAYSAK (POST)
-    else {
+    } else {
         if(!document.getElementById('clickedLat').value) { showToast("Lütfen haritada bir yere tıkla!", "error"); return; }
         fetch('/api/places', { method: 'POST', body: formData })
         .then(r => r.json()).then(d => {
@@ -296,17 +264,13 @@ document.getElementById('placeForm').addEventListener('submit', function(e) {
     }
 });
 
-// Formu temizleyen yardımcı fonksiyon
 function resetForm() {
     document.getElementById('placeForm').reset();
     editingPlaceId = null;
     const titleEl = document.querySelector('#addPlacePanel h3');
     const btnEl = document.querySelector('#placeForm button[type="submit"]');
-    
-    // Başlık ve butonu eski haline getir
-    if(titleEl) titleEl.textContent = "📍 Yer Bildirimi"; // HTML'deki başlık ile aynı yaptık
+    if(titleEl) titleEl.textContent = "📍 Yer Bildirimi"; 
     if(btnEl) btnEl.textContent = "Paylaş";
-    
     showPanel('defaultAction');
 }
 
@@ -348,19 +312,17 @@ if(avatarInput) {
     });
 }
 
+// ✅ DÜZELTİLEN KISIM: Profil resmi hem sağ üstte hem de gönderi kutusunda değişecek
 function updateUserStatus(loggedIn, userData) {
     const container = document.getElementById('userStatus');
-    const placeholderImg = document.getElementById('userAvatarPlaceholder'); // HTML'de eklediğimiz ID'yi bul
+    const placeholderImg = document.getElementById('userAvatarPlaceholder'); 
 
     if(loggedIn) {
         currentUser = userData;
-        // Profil resmi varsa onu kullan, yoksa isminin baş harflerini kullan
         const avatarUrl = userData.profilePic ? userData.profilePic : `https://ui-avatars.com/api/?name=${userData.userName}&background=random`;
         
-        // 1. Sağ üstteki kullanıcı butonu
         container.innerHTML = `<button onclick="openProfile()"><img src="${avatarUrl}" class="user-avatar" style="object-fit:cover;">${userData.userName}</button>`;
         
-        // 2. "Kampüste neler oluyor?" kısmındaki yuvarlak resim (Senin istediğin düzeltme)
         if(placeholderImg) {
             placeholderImg.src = avatarUrl;
         }
@@ -368,10 +330,8 @@ function updateUserStatus(loggedIn, userData) {
         renderFeed(allPlaces); 
     } else {
         currentUser = null;
-        // Çıkış yapınca buton "Giriş Yap" olsun
         container.innerHTML = `<button onclick="showPanel('loginPanel')">Giriş Yap</button>`;
         
-        // Çıkış yapınca resim tekrar "SE" (Sen) olsun
         if(placeholderImg) {
             placeholderImg.src = "https://ui-avatars.com/api/?name=Sen&background=random";
         }
@@ -402,8 +362,6 @@ function openProfile() {
             div.className = 'feed-card';
             div.style.padding = "10px";
             div.style.position = "relative";
-            
-            // Profilde de silme butonu olsun (Manuel koordinatlı)
             div.innerHTML = `
                 <button class="btn-action btn-delete" onclick="deletePlace(${place.id}, event)" title="Sil" style="position:absolute; top:5px; right:5px;">
                     <i class="fa-solid fa-trash"></i>
