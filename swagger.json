@@ -1,0 +1,146 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Hacettepe Social API",
+    "version": "1.0.0",
+    "description": "Hacettepe Social Projesi API Dokümantasyonu",
+    "contact": {
+      "email": "ogrenci@hacettepe.edu.tr"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://63.177.100.32:3000",
+      "description": "AWS Canlı Sunucu"
+    },
+    {
+      "url": "http://localhost:3000",
+      "description": "Local Sunucu"
+    }
+  ],
+  "paths": {
+    "/api/places": {
+      "get": {
+        "summary": "Tüm mekanları getir",
+        "responses": {
+          "200": {
+            "description": "Başarılı"
+          }
+        }
+      },
+      "post": {
+        "summary": "Yeni mekan ekle",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "category": { "type": "string" },
+                  "lat": { "type": "string" },
+                  "lng": { "type": "string" },
+                  "mediaFile": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Eklendi" }
+        }
+      }
+    },
+    "/api/places/{id}": {
+      "delete": {
+        "summary": "Mekan sil",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Silindi" }
+        }
+      },
+      "put": {
+        "summary": "Mekan güncelle",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "category": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Güncellendi" }
+        }
+      }
+    },
+    "/api/login": {
+      "post": {
+        "summary": "Giriş Yap",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "loginId": { "type": "string" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Giriş Başarılı" }
+        }
+      }
+    },
+    "/api/register": {
+      "post": {
+        "summary": "Kayıt Ol",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "firstName": { "type": "string" },
+                  "lastName": { "type": "string" },
+                  "studentId": { "type": "string" },
+                  "email": { "type": "string" },
+                  "password": { "type": "string" },
+                  "profilePic": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Kayıt Başarılı" }
+        }
+      }
+    }
+  }
+}

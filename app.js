@@ -6,37 +6,15 @@ const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const pool = require('./config/db');
 
+// --- SWAGGER (JSON YÖNTEMİ) ---
+const swaggerUi = require('swagger-ui-express');
+const swaggerDocument = require('./swagger.json'); // Yeni dosyayı çağırıyoruz
+
 const app = express();
 const port = 3000;
 
-// --- SWAGGER AYARLARI ---
-const swaggerUi = require('swagger-ui-express');
-const swaggerJsdoc = require('swagger-jsdoc');
-
-const swaggerOptions = {
-    definition: {
-        openapi: '3.0.0',
-        info: {
-            title: 'Hacettepe Social API',
-            version: '1.0.0',
-            description: 'Hacettepe Social Projesi API Dokümantasyonu',
-            contact: {
-                name: 'Geliştirici',
-                email: 'ogrenci@hacettepe.edu.tr'
-            }
-        },
-        servers: [
-            { url: 'http://localhost:3000', description: 'Local Sunucu' },
-            // NOT: Buraya kendi AWS IP adresini yaz (Önceki mesajdaki IP'yi kullandım)
-            { url: 'http://63.177.100.32:3000', description: 'AWS Canlı Sunucu' } 
-        ]
-    },
-    apis: ['./app.js'], 
-};
-
-const swaggerDocs = swaggerJsdoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
-
+// Swagger Sayfasını Başlat
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // --- ARA YAZILIMLAR ---
 app.use(express.json()); 
@@ -58,16 +36,7 @@ const upload = multer({ dest: 'public/uploads/' });
 
 // --- ROTALAR ---
 
-/**
- * @swagger
- * /api/places:
- * get:
- * summary: Tüm mekanları listeler
- * description: Harita üzerindeki pinleri ve detaylarını getirir.
- * responses:
- * 200:
- * description: Başarılı
- */
+// Tüm mekanları getir
 app.get('/api/places', async (req, res) => {
     try {
         const query = `
@@ -97,34 +66,7 @@ app.get('/api/places', async (req, res) => {
     }
 });
 
-/**
- * @swagger
- * /api/places:
- * post:
- * summary: Yeni mekan ekler
- * requestBody:
- * content:
- * multipart/form-data:
- * schema:
- * type: object
- * properties:
- * name:
- * type: string
- * description:
- * type: string
- * category:
- * type: string
- * lat:
- * type: string
- * lng:
- * type: string
- * mediaFile:
- * type: string
- * format: binary
- * responses:
- * 200:
- * description: Eklendi
- */
+// Yeni mekan ekle
 app.post('/api/places', upload.single('mediaFile'), async (req, res) => {
     const { name, description, lat, lng, category } = req.body;
     const mediaUrl = req.file ? `/uploads/${req.file.filename}` : null;
@@ -142,21 +84,7 @@ app.post('/api/places', upload.single('mediaFile'), async (req, res) => {
     }
 });
 
-/**
- * @swagger
- * /api/places/{id}:
- * delete:
- * summary: Mekan siler
- * parameters:
- * - in: path
- * name: id
- * required: true
- * schema:
- * type: integer
- * responses:
- * 200:
- * description: Silindi
- */
+// Mekan sil
 app.delete('/api/places/:id', async (req, res) => {
     const placeId = req.params.id;
     const userId = req.session.userId;
@@ -177,33 +105,7 @@ app.delete('/api/places/:id', async (req, res) => {
     }
 });
 
-/**
- * @swagger
- * /api/places/{id}:
- * put:
- * summary: Mekan günceller
- * parameters:
- * - in: path
- * name: id
- * required: true
- * schema:
- * type: integer
- * requestBody:
- * content:
- * multipart/form-data:
- * schema:
- * type: object
- * properties:
- * name:
- * type: string
- * description:
- * type: string
- * category:
- * type: string
- * responses:
- * 200:
- * description: Güncellendi
- */
+// Mekan güncelle
 app.put('/api/places/:id', upload.none(), async (req, res) => {
     const placeId = req.params.id;
     const { name, description, category } = req.body;
@@ -228,32 +130,7 @@ app.put('/api/places/:id', upload.none(), async (req, res) => {
     }
 });
 
-/**
- * @swagger
- * /api/register:
- * post:
- * summary: Kayıt Ol
- * requestBody:
- * content:
- * multipart/form-data:
- * schema:
- * type: object
- * properties:
- * firstName:
- * type: string
- * lastName:
- * type: string
- * email:
- * type: string
- * password:
- * type: string
- * profilePic:
- * type: string
- * format: binary
- * responses:
- * 201:
- * description: Kayıt Başarılı
- */
+// Kayıt Ol
 app.post('/api/register', upload.single('profilePic'), async (req, res) => {
     const { firstName, lastName, studentId, email, password } = req.body;
     const profilePic = req.file ? `/uploads/${req.file.filename}` : null;
@@ -271,25 +148,7 @@ app.post('/api/register', upload.single('profilePic'), async (req, res) => {
     }
 });
 
-/**
- * @swagger
- * /api/login:
- * post:
- * summary: Giriş Yap
- * requestBody:
- * content:
- * application/json:
- * schema:
- * type: object
- * properties:
- * loginId:
- * type: string
- * password:
- * type: string
- * responses:
- * 200:
- * description: Giriş Başarılı
- */
+// Giriş Yap
 app.post('/api/login', async (req, res) => {
     const { loginId, password } = req.body;
     try {
@@ -333,25 +192,6 @@ setInterval(async () => {
     await pool.query("DELETE FROM places WHERE created_at < NOW() - INTERVAL '24 hours'");
 }, 60 * 60 * 1000);
 
-/**
- * @swagger
- * /api/comments:
- * post:
- * summary: Yorum Yap
- * requestBody:
- * content:
- * application/json:
- * schema:
- * type: object
- * properties:
- * placeId:
- * type: integer
- * text:
- * type: string
- * responses:
- * 200:
- * description: Eklendi
- */
 app.post('/api/comments', async (req, res) => {
     const { placeId, text } = req.body;
     const userId = req.session.userId;
