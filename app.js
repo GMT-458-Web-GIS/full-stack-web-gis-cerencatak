@@ -9,7 +9,7 @@ const pool = require('./config/db');
 const app = express();
 const port = 3000;
 
-// --- SWAGGER DOKÜMANTASYON AYARLARI ---
+// --- SWAGGER AYARLARI ---
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 
@@ -19,19 +19,18 @@ const swaggerOptions = {
         info: {
             title: 'Hacettepe Social API',
             version: '1.0.0',
-            description: 'Hacettepe Social Projesi için API Servis Dokümantasyonu',
+            description: 'Hacettepe Social Projesi API Dokümantasyonu',
             contact: {
                 name: 'Geliştirici',
-                email: 'cerencatak@hacettepe.edu.tr'
+                email: 'ogrenci@hacettepe.edu.tr'
             }
         },
         servers: [
             { url: 'http://localhost:3000', description: 'Local Sunucu' },
-            // NOT: Buradaki IP adresini AWS'deki güncel IP adresinle değiştirmeyi unutma!
-            { url: 'http://35.174.192.176:3000', description: 'AWS Canlı Sunucu' } 
+            // Buraya kendi IP adresini yaz:
+            { url: 'http://63.177.100.32:3000', description: 'AWS Canlı Sunucu' } 
         ]
     },
-    // Bu dosyadaki yorumları okuyacak
     apis: ['./app.js'], 
 };
 
@@ -39,12 +38,12 @@ const swaggerDocs = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 
-// --- 1. ARA YAZILIMLAR ---
+// --- ARA YAZILIMLAR ---
 app.use(express.json()); 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// --- 2. OTURUM AYARLARI ---
+// --- OTURUM ---
 app.use(session({
     secret: 'student-save-secret-key',
     resave: false,
@@ -52,22 +51,22 @@ app.use(session({
     cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
 }));
 
-// --- 3. DOSYA YÜKLEME ---
+// --- DOSYA YÜKLEME ---
 const uploadDir = path.join(__dirname, 'public/uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 const upload = multer({ dest: 'public/uploads/' });
 
-// --- 4. ROTALAR ---
+// --- ROTALAR ---
 
 /**
  * @swagger
  * /api/places:
  * get:
- * summary: Tüm mekanları ve yorumları listeler
- * description: Harita üzerindeki pinleri, detaylarını ve ilişkili yorumları getirir.
+ * summary: Tüm mekanları listeler
+ * description: Harita üzerindeki pinleri ve detaylarını getirir.
  * responses:
  * 200:
- * description: Başarılı, mekan listesi döndü.
+ * description: Başarılı
  */
 app.get('/api/places', async (req, res) => {
     try {
@@ -91,11 +90,9 @@ app.get('/api/places', async (req, res) => {
             GROUP BY p.id
             ORDER BY p.created_at DESC
         `;
-        
         const result = await pool.query(query);
         res.json(result.rows);
     } catch (err) {
-        console.error(err);
         res.status(500).send('Veri çekme hatası');
     }
 });
@@ -104,8 +101,7 @@ app.get('/api/places', async (req, res) => {
  * @swagger
  * /api/places:
  * post:
- * summary: Yeni bir mekan ekler
- * description: Harita üzerinde seçilen konuma yeni bir yer bildirimi yapar.
+ * summary: Yeni mekan ekler
  * requestBody:
  * content:
  * multipart/form-data:
@@ -119,25 +115,21 @@ app.get('/api/places', async (req, res) => {
  * category:
  * type: string
  * lat:
- * type: number
+ * type: string
  * lng:
- * type: number
+ * type: string
  * mediaFile:
  * type: string
  * format: binary
  * responses:
  * 200:
- * description: Mekan başarıyla eklendi.
- * 401:
- * description: Giriş yapmalısınız.
+ * description: Eklendi
  */
 app.post('/api/places', upload.single('mediaFile'), async (req, res) => {
     const { name, description, lat, lng, category } = req.body;
     const mediaUrl = req.file ? `/uploads/${req.file.filename}` : null;
     const userId = req.session.userId; 
-
     if (!userId) return res.status(401).json({ success: false, error: "Giriş yapmalısın!" });
-
     try {
         await pool.query(
             `INSERT INTO places (name, description, type, media_url, geom, user_id) 
@@ -146,7 +138,6 @@ app.post('/api/places', upload.single('mediaFile'), async (req, res) => {
         );
         res.json({ success: true });
     } catch (err) {
-        console.error(err);
         res.status(500).json({ success: false, error: "Kaydedilemedi" });
     }
 });
@@ -155,8 +146,7 @@ app.post('/api/places', upload.single('mediaFile'), async (req, res) => {
  * @swagger
  * /api/places/{id}:
  * delete:
- * summary: Bir mekanı siler
- * description: Sadece admin veya gönderiyi paylaşan kişi silebilir.
+ * summary: Mekan siler
  * parameters:
  * - in: path
  * name: id
@@ -165,36 +155,25 @@ app.post('/api/places', upload.single('mediaFile'), async (req, res) => {
  * type: integer
  * responses:
  * 200:
- * description: Silme başarılı.
- * 403:
- * description: Yetkisiz işlem.
+ * description: Silindi
  */
 app.delete('/api/places/:id', async (req, res) => {
     const placeId = req.params.id;
     const userId = req.session.userId;
     const isAdmin = req.session.isAdmin; 
-
     if (!userId) return res.status(401).json({ success: false, error: "Oturum kapalı." });
-
     try {
         const checkQuery = await pool.query("SELECT user_id FROM places WHERE id = $1", [placeId]);
-        
-        if (checkQuery.rows.length === 0) {
-            return res.status(404).json({ success: false, error: "Mekan bulunamadı." });
-        }
-
+        if (checkQuery.rows.length === 0) return res.status(404).json({ success: false, error: "Bulunamadı." });
         const postOwnerId = checkQuery.rows[0].user_id;
-
         if (isAdmin || postOwnerId === userId) {
             await pool.query("DELETE FROM places WHERE id = $1", [placeId]);
             res.json({ success: true });
         } else {
-            res.status(403).json({ success: false, error: "Bunu silmeye yetkin yok!" });
+            res.status(403).json({ success: false, error: "Yetkisiz!" });
         }
-
     } catch (err) {
-        console.error("Silme hatası:", err);
-        res.status(500).json({ success: false, error: "Sunucu hatası." });
+        res.status(500).json({ success: false });
     }
 });
 
@@ -202,7 +181,7 @@ app.delete('/api/places/:id', async (req, res) => {
  * @swagger
  * /api/places/{id}:
  * put:
- * summary: Mekan bilgilerini günceller
+ * summary: Mekan günceller
  * parameters:
  * - in: path
  * name: id
@@ -223,22 +202,18 @@ app.delete('/api/places/:id', async (req, res) => {
  * type: string
  * responses:
  * 200:
- * description: Güncelleme başarılı.
+ * description: Güncellendi
  */
 app.put('/api/places/:id', upload.none(), async (req, res) => {
     const placeId = req.params.id;
     const { name, description, category } = req.body;
     const userId = req.session.userId;
     const isAdmin = req.session.isAdmin;
-
     if (!userId) return res.status(401).json({ success: false, error: "Oturum kapalı." });
-
     try {
         const checkQuery = await pool.query("SELECT user_id FROM places WHERE id = $1", [placeId]);
-        if (checkQuery.rows.length === 0) return res.status(404).json({ success: false, error: "Mekan bulunamadı." });
-        
+        if (checkQuery.rows.length === 0) return res.status(404).json({ success: false });
         const postOwnerId = checkQuery.rows[0].user_id;
-        
         if (isAdmin || postOwnerId === userId) {
             await pool.query(
                 "UPDATE places SET name = $1, description = $2, type = $3 WHERE id = $4",
@@ -246,11 +221,10 @@ app.put('/api/places/:id', upload.none(), async (req, res) => {
             );
             res.json({ success: true });
         } else {
-            res.status(403).json({ success: false, error: "Yetkisiz işlem!" });
+            res.status(403).json({ success: false });
         }
     } catch (err) {
-        console.error("Güncelleme hatası:", err);
-        res.status(500).json({ success: false, error: "Sunucu hatası." });
+        res.status(500).json({ success: false });
     }
 });
 
@@ -258,7 +232,7 @@ app.put('/api/places/:id', upload.none(), async (req, res) => {
  * @swagger
  * /api/register:
  * post:
- * summary: Yeni kullanıcı kaydı
+ * summary: Kayıt Ol
  * requestBody:
  * content:
  * multipart/form-data:
@@ -269,8 +243,6 @@ app.put('/api/places/:id', upload.none(), async (req, res) => {
  * type: string
  * lastName:
  * type: string
- * studentId:
- * type: string
  * email:
  * type: string
  * password:
@@ -280,7 +252,7 @@ app.put('/api/places/:id', upload.none(), async (req, res) => {
  * format: binary
  * responses:
  * 201:
- * description: Kayıt başarılı.
+ * description: Kayıt Başarılı
  */
 app.post('/api/register', upload.single('profilePic'), async (req, res) => {
     const { firstName, lastName, studentId, email, password } = req.body;
@@ -295,7 +267,7 @@ app.post('/api/register', upload.single('profilePic'), async (req, res) => {
         );
         res.status(201).json({ success: true });
     } catch (err) {
-        res.status(500).json({ success: false, error: "Kayıt yapılamadı." });
+        res.status(500).json({ success: false });
     }
 });
 
@@ -303,7 +275,7 @@ app.post('/api/register', upload.single('profilePic'), async (req, res) => {
  * @swagger
  * /api/login:
  * post:
- * summary: Kullanıcı girişi
+ * summary: Giriş Yap
  * requestBody:
  * content:
  * application/json:
@@ -312,59 +284,41 @@ app.post('/api/register', upload.single('profilePic'), async (req, res) => {
  * properties:
  * loginId:
  * type: string
- * description: Email veya Öğrenci No
  * password:
  * type: string
  * responses:
  * 200:
- * description: Giriş başarılı.
+ * description: Giriş Başarılı
  */
 app.post('/api/login', async (req, res) => {
     const { loginId, password } = req.body;
     try {
         const result = await pool.query('SELECT * FROM users WHERE email = $1 OR student_id = $2', [loginId, loginId]);
         if (result.rows.length === 0) return res.status(401).json({ success: false, error: "Kullanıcı yok." });
-
         const user = result.rows[0];
         const isMatch = await bcrypt.compare(password, user.password_hash);
-
         if (isMatch) {
             req.session.userId = user.id;
             req.session.userName = user.first_name;
             req.session.profilePic = user.profile_pic;
             req.session.isAdmin = user.is_admin; 
-            
-            res.json({ 
-                success: true, 
-                userName: user.first_name, 
-                userId: user.id, 
-                profilePic: user.profile_pic,
-                isAdmin: user.is_admin 
-            });
+            res.json({ success: true, userName: user.first_name, userId: user.id, profilePic: user.profile_pic, isAdmin: user.is_admin });
         } else {
             res.status(401).json({ success: false, error: "Şifre hatalı." });
         }
     } catch (err) {
-        res.status(500).json({ success: false, error: "Sunucu hatası." });
+        res.status(500).json({ success: false });
     }
 });
 
-// Oturum Kontrol
 app.get('/api/check-auth', (req, res) => {
     if (req.session.userId) {
-        res.json({ 
-            loggedIn: true, 
-            userName: req.session.userName, 
-            userId: req.session.userId,
-            profilePic: req.session.profilePic,
-            isAdmin: req.session.isAdmin 
-        });
+        res.json({ loggedIn: true, userName: req.session.userName, userId: req.session.userId, profilePic: req.session.profilePic, isAdmin: req.session.isAdmin });
     } else {
         res.json({ loggedIn: false });
     }
 });
 
-// Profil Resmi Güncelleme
 app.post('/api/update-avatar', upload.single('profilePic'), async (req, res) => {
     if (!req.session.userId || !req.file) return res.status(400).json({ success: false });
     const newProfilePic = `/uploads/${req.file.filename}`;
@@ -375,7 +329,6 @@ app.post('/api/update-avatar', upload.single('profilePic'), async (req, res) => 
 
 app.get('/api/logout', (req, res) => { req.session.destroy(); res.json({ success: true }); });
 
-// 24 Saat Temizlik
 setInterval(async () => {
     await pool.query("DELETE FROM places WHERE created_at < NOW() - INTERVAL '24 hours'");
 }, 60 * 60 * 1000);
@@ -384,7 +337,7 @@ setInterval(async () => {
  * @swagger
  * /api/comments:
  * post:
- * summary: Mekana yorum yap
+ * summary: Yorum Yap
  * requestBody:
  * content:
  * application/json:
@@ -397,24 +350,18 @@ setInterval(async () => {
  * type: string
  * responses:
  * 200:
- * description: Yorum eklendi.
+ * description: Eklendi
  */
 app.post('/api/comments', async (req, res) => {
     const { placeId, text } = req.body;
     const userId = req.session.userId;
-
-    if (!userId) return res.status(401).json({ success: false, error: "Giriş yapmalısın." });
-    if (!text || text.trim() === "") return res.status(400).json({ success: false, error: "Boş yorum olmaz." });
-
+    if (!userId) return res.status(401).json({ success: false });
+    if (!text || text.trim() === "") return res.status(400).json({ success: false });
     try {
-        await pool.query(
-            "INSERT INTO comments (place_id, user_id, comment_text) VALUES ($1, $2, $3)",
-            [placeId, userId, text]
-        );
+        await pool.query("INSERT INTO comments (place_id, user_id, comment_text) VALUES ($1, $2, $3)", [placeId, userId, text]);
         res.json({ success: true });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, error: "Yorum eklenemedi." });
+        res.status(500).json({ success: false });
     }
 });
 
