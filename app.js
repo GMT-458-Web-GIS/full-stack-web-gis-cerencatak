@@ -27,11 +27,11 @@ const swaggerOptions = {
         },
         servers: [
             { url: 'http://localhost:3000', description: 'Local Sunucu' },
-            // Buraya kendi IP adresini yaz:
+            // NOT: Buradaki IP adresini kendi AWS IP adresinle değiştirmeyi unutma!
             { url: 'http://63.177.100.32:3000', description: 'AWS Canlı Sunucu' } 
         ]
     },
-    apis: ['./app.js'], 
+    apis: ['./app.js'], // Bu dosyadaki yorumları okur
 };
 
 const swaggerDocs = swaggerJsdoc(swaggerOptions);
