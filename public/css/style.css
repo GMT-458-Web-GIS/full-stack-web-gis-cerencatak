@@ -303,27 +303,35 @@ body {
 }
 .comment-form button:hover { background: var(--primary); color: white; border-color: var(--primary); }
 
-/* --- Butonlar (Güncel Hali) --- */
+/* --- Butonları Tutan Kapsayıcı Kutu --- */
+.card-actions {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: column; /* Kesinlikle alt alta diz */
+    gap: 8px; /* Aralarında 8px boşluk olsun */
+    z-index: 10;
+}
+
+/* --- Butonların Kendisi --- */
 .btn-action {
     background: white;
     border: none;
     cursor: pointer;
-    width: 32px; /* Biraz büyüttük */
+    width: 32px;
     height: 32px;
-    border-radius: 50%; /* Tam yuvarlak */
-    
-    /* İkonu tam merkeze hizalama sihri */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    
+    border-radius: 50%;
+    display: flex;             /* İkonu ortalamak için */
+    align-items: center;       /* Dikeyde ortala */
+    justify-content: center;   /* Yatayda ortala */
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     font-size: 14px;
-    transition: all 0.2s ease; /* Yumuşak geçiş efekti */
+    transition: transform 0.2s;
 }
 
-.btn-edit { color: #3498db; } /* Mavi Kalem */
+.btn-edit { color: #3498db; }
 .btn-edit:hover { background: #3498db; color: white; transform: scale(1.1); }
 
-.btn-delete { color: #e74c3c; } /* Kırmızı Çöp Kutusu */
+.btn-delete { color: #e74c3c; }
 .btn-delete:hover { background: #e74c3c; color: white; transform: scale(1.1); }

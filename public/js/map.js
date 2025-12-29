@@ -62,10 +62,12 @@ function renderFeed(places) {
 
         // --- BUTONLAR (SİLME VE DÜZENLEME) ---
         // map.js içinde bu kısmı bul ve aşağıdaki ile değiştir:
+        // --- SİLME ve DÜZENLEME BUTONLARI ---
         let actionBtns = '';
         if (currentUser && (currentUser.isAdmin || currentUser.userId === place.user_id)) {
+            // Artık stil yok, sadece class ismi var: "card-actions"
             actionBtns = `
-            <div style="position:absolute; top:10px; right:10px; display:flex; flex-direction: column; gap:5px; z-index:5;">
+            <div class="card-actions">
                 <button class="btn-action btn-edit" onclick="editPlace(${place.id}, event)" title="Düzenle">
                     <i class="fa-solid fa-pen"></i>
                 </button>
@@ -75,7 +77,7 @@ function renderFeed(places) {
             </div>`;
         }
 
-        
+
         // Yorum HTML'i
         let commentsHtml = '';
         if(commentsList.length > 0) {
