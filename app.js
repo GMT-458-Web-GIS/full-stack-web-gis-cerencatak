@@ -5,7 +5,6 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs'); 
 const session = require('express-session');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer'); // Mail kütüphanesi
 const pool = require('./config/db');
 
 // --- SWAGGER ---
@@ -35,19 +34,6 @@ app.use(session({
 const uploadDir = path.join(__dirname, 'public/uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 const upload = multer({ dest: 'public/uploads/' });
-
-// ==========================================
-// 👇 MAİL AYARLARI  👇
-// ==========================================
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: 'cerencatak00@gmail.com', // 👈 Buraya kendi Gmail adresini yaz
-        pass: 'nizjaflhqktpbdxg'           // 👈 Buraya aldığın 16 haneli UYGULAMA ŞİFRESİNİ yaz
-    }
-});
-// ==========================================
-
 
 // --- ROTALAR ---
 
@@ -151,43 +137,34 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// 6. ŞİFREMİ UNUTTUM (GERÇEK MAİL GÖNDERME 📨)
+// 6. ŞİFREMİ UNUTTUM (Geliştirici/Terminal Modu - Google Engelini Aşmak İçin)
 app.post('/api/forgot-password', async (req, res) => {
     const { email } = req.body;
     try {
         const userCheck = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
         if (userCheck.rows.length === 0) {
-            return res.json({ success: true, message: "Eğer kayıtlıysa, link gönderildi!" });
+            return res.json({ success: true, message: "İşlem tamamlandı, lütfen sistem loglarını kontrol edin." });
         }
 
         const token = crypto.randomBytes(20).toString('hex');
-        const expireTime = new Date(Date.now() + 3600000); // 1 saat
+        const expireTime = new Date(Date.now() + 3600000); 
 
         await pool.query("UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE email = $3", [token, expireTime, email]);
 
         const resetLink = `http://63.177.100.32:3000/reset-password.html?token=${token}`;
 
-        const mailOptions = {
-            from: '"Hacettepe Social" <no-reply@hacettepesocial.com>',
-            to: email,
-            subject: '🔒 Şifre Sıfırlama İsteği',
-            html: `
-                <h3>Merhaba!</h3>
-                <p>Şifreni sıfırlamak için aşağıdaki butona tıkla:</p>
-                <a href="${resetLink}" style="background-color:#c0392b; color:white; padding:10px 20px; text-decoration:none; border-radius:5px;">Şifremi Sıfırla</a>
-                <p>veya linki kopyala: ${resetLink}</p>
-                <p>Bu isteği sen yapmadıysan, dikkate alma.</p>
-            `
-        };
+        // 🔥 TERMİNALE YAZDIRMA (Sunum sırasında buradan kopyalayacaksın)
+        console.log("\n" + "=".repeat(50));
+        console.log("📩 [GELİŞTİRİCİ MESAJI] ŞİFRE SIFIRLAMA LİNKİ");
+        console.log(`📧 E-posta: ${email}`);
+        console.log(`🔗 Link: ${resetLink}`);
+        console.log("=".repeat(50) + "\n");
 
-        await transporter.sendMail(mailOptions);
-        console.log("✅ Mail başarıyla gönderildi: " + email);
-
-        res.json({ success: true, message: "Sıfırlama linki e-postana gönderildi!" });
+        res.json({ success: true, message: "Sıfırlama linki oluşturuldu. Sunucu loglarını (Terminal) kontrol ediniz." });
 
     } catch (err) {
-        console.error("Mail Hatası:", err);
-        res.status(500).json({ success: false, error: "Mail gönderilemedi (Ayarları kontrol et)" });
+        console.error("Sistem Hatası:", err);
+        res.status(500).json({ success: false, error: "Bir hata oluştu." });
     }
 });
 
