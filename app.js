@@ -36,22 +36,22 @@ const upload = multer({ dest: 'public/uploads/' });
 
 // --- ROTALAR ---
 
-// MEKANLARI LİSTELEME API'Sİ (GÜNCELLENDİ ve DÜZELTİLDİ ✅)
+// MEKANLARI LİSTELEME API'Sİ (GÜVENLİ MOD - HARİTA AÇILSIN DİYE)
 app.get('/api/places', async (req, res) => {
     try {
-        // DÜZELTME: 'username' sütunu olmadığı için ad ve soyadı birleştiriyoruz.
-        // CONCAT fonksiyonu first_name ve last_name'i yan yana yazar.
-        const result = await pool.query(`
-            SELECT places.*, 
-                   CONCAT(users.first_name, ' ', users.last_name) as user_name, 
-                   users.profile_pic 
-            FROM places 
-            LEFT JOIN users ON places.user_id = users.id 
-            ORDER BY places.created_at DESC
-        `);
-        res.json(result.rows);
+        // JOIN işlemini kaldırdık, sadece mekanları çekiyoruz
+        const result = await pool.query('SELECT * FROM places ORDER BY created_at DESC');
+        
+        // Frontend hata vermesin diye boş user verisi ekliyoruz
+        const safeRows = result.rows.map(row => ({
+            ...row,
+            user_name: 'Bir Öğrenci', // İsim yerine sabit yazı
+            profile_pic: null         // Resim yok
+        }));
+        
+        res.json(safeRows);
     } catch (err) {
-        console.error("API Hatası:", err); // Hatayı terminalde detaylı görelim
+        console.error(err);
         res.status(500).json({ error: 'Veritabanı hatası' });
     }
 });
