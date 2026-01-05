@@ -56,6 +56,18 @@ function renderFeed(places) {
         const category = place.type || 'diger';
         const time = place.formatted_time || 'Az önce';
         
+        // --- 🖼️ YENİ KISIM: Profil Resmi vs İkon Mantığı ---
+        let leftIconHtml = '';
+        
+        // Eğer veritabanından gelen veride profil resmi varsa onu kullan
+        if (place.profile_pic) {
+            leftIconHtml = `<img src="${place.profile_pic}" style="width:42px; height:42px; border-radius:50%; object-fit:cover; border:2px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.1);">`;
+        } else {
+            // Yoksa klasik kategori ikonunu (Pin) kullan
+            leftIconHtml = `<img src="${getIconUrl(category)}" style="height:32px;">`;
+        }
+        // ----------------------------------------------------
+
         let commentsList = place.comments;
         if (typeof commentsList === 'string') {
             try { commentsList = JSON.parse(commentsList); } 
@@ -99,12 +111,14 @@ function renderFeed(places) {
         card.style.position = 'relative'; 
         card.innerHTML = `
             ${actionBtns}
-            <div class="card-icon">
-                <img src="${getIconUrl(category)}" style="height:30px;">
+            
+            <div class="card-icon" style="display:flex; justify-content:center; align-items:center; width:50px;">
+                ${leftIconHtml}
             </div>
+
             <div class="card-content">
                 <div class="card-header">
-                    <span><strong>Mekan Bildirimi</strong> &bull; ${time}</span>
+                    <span><strong>${place.user_name || 'Bir Öğrenci'}</strong> &bull; ${time}</span>
                 </div>
                 <h4 style="margin:0 0 5px 0; color:#c0392b;">${place.name}</h4>
                 <p class="card-text">${place.description}</p>
@@ -127,16 +141,11 @@ function renderFeed(places) {
         
         card.addEventListener('click', (e) => {
             if (!e.target.closest('.btn-action') && !e.target.closest('.comment-form') && !e.target.tagName.match(/INPUT|BUTTON/)) {
-                // Eğer cluster içindeyse zoom yap, değilse direkt git
                 map.flyTo([place.geometry.coordinates[1], place.geometry.coordinates[0]], 17);
-                
-                // Marker'ı bulup popup aç (Cluster içindeyse bu biraz zordur ama zoom yapınca görünür olur)
-                // Kümeyi açmak için biraz bekleme süresi
                 setTimeout(() => {
                     if(map.hasLayer(place.marker)) {
                         place.marker.openPopup();
                     } else {
-                        // Eğer hala küme içindeyse, kümeyi açmaya zorla
                         markersLayer.zoomToShowLayer(place.marker, () => {
                             place.marker.openPopup();
                         });
