@@ -8,7 +8,7 @@ const pool = require('./config/db');
 
 // --- SWAGGER (JSON YÖNTEMİ) ---
 const swaggerUi = require('swagger-ui-express');
-const swaggerDocument = require('./swagger.json'); // Yeni dosyayı çağırıyoruz
+const swaggerDocument = require('./swagger.json'); 
 
 const app = express();
 const port = 3000;
@@ -36,21 +36,22 @@ const upload = multer({ dest: 'public/uploads/' });
 
 // --- ROTALAR ---
 
-// Tüm mekanları getir
-// MEKANLARI LİSTELEME API'Sİ (GÜNCELLENDİ)
+// MEKANLARI LİSTELEME API'Sİ (GÜNCELLENDİ ve DÜZELTİLDİ ✅)
 app.get('/api/places', async (req, res) => {
     try {
-        // ✅ YENİ SORGU: Places tablosunu Users tablosuyla birleştiriyoruz
-        // Böylece paylaşan kişinin ismi ve profil resmi de geliyor.
+        // DÜZELTME: 'username' sütunu olmadığı için ad ve soyadı birleştiriyoruz.
+        // CONCAT fonksiyonu first_name ve last_name'i yan yana yazar.
         const result = await pool.query(`
-            SELECT places.*, users.username as user_name, users.profile_pic 
+            SELECT places.*, 
+                   CONCAT(users.first_name, ' ', users.last_name) as user_name, 
+                   users.profile_pic 
             FROM places 
             LEFT JOIN users ON places.user_id = users.id 
             ORDER BY places.created_at DESC
         `);
         res.json(result.rows);
     } catch (err) {
-        console.error(err);
+        console.error("API Hatası:", err); // Hatayı terminalde detaylı görelim
         res.status(500).json({ error: 'Veritabanı hatası' });
     }
 });
@@ -69,6 +70,7 @@ app.post('/api/places', upload.single('mediaFile'), async (req, res) => {
         );
         res.json({ success: true });
     } catch (err) {
+        console.error(err);
         res.status(500).json({ success: false, error: "Kaydedilemedi" });
     }
 });
@@ -133,6 +135,7 @@ app.post('/api/register', upload.single('profilePic'), async (req, res) => {
         );
         res.status(201).json({ success: true });
     } catch (err) {
+        console.error(err);
         res.status(500).json({ success: false });
     }
 });
