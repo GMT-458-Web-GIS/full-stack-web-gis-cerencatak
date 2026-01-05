@@ -37,32 +37,21 @@ const upload = multer({ dest: 'public/uploads/' });
 // --- ROTALAR ---
 
 // Tüm mekanları getir
+// MEKANLARI LİSTELEME API'Sİ (GÜNCELLENDİ)
 app.get('/api/places', async (req, res) => {
     try {
-        const query = `
-            SELECT p.id, p.name, p.description, p.type, p.media_url, p.user_id,
-            to_char(p.created_at, 'DD.MM.YYYY HH24:MI') as formatted_time,
-            ST_AsGeoJSON(p.geom)::json as geometry,
-            COALESCE(
-                json_agg(
-                    json_build_object(
-                        'text', c.comment_text,
-                        'sender', u.first_name,
-                        'avatar', u.profile_pic
-                    ) ORDER BY c.created_at ASC
-                ) FILTER (WHERE c.id IS NOT NULL),
-                '[]'::json
-            ) as comments
-            FROM places p
-            LEFT JOIN comments c ON p.id = c.place_id
-            LEFT JOIN users u ON c.user_id = u.id
-            GROUP BY p.id
-            ORDER BY p.created_at DESC
-        `;
-        const result = await pool.query(query);
+        // ✅ YENİ SORGU: Places tablosunu Users tablosuyla birleştiriyoruz
+        // Böylece paylaşan kişinin ismi ve profil resmi de geliyor.
+        const result = await pool.query(`
+            SELECT places.*, users.username as user_name, users.profile_pic 
+            FROM places 
+            LEFT JOIN users ON places.user_id = users.id 
+            ORDER BY places.created_at DESC
+        `);
         res.json(result.rows);
     } catch (err) {
-        res.status(500).send('Veri çekme hatası');
+        console.error(err);
+        res.status(500).json({ error: 'Veritabanı hatası' });
     }
 });
 
