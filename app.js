@@ -38,12 +38,13 @@ const upload = multer({ dest: 'public/uploads/' });
 
 // MEKANLARI LİSTELEME API'Sİ (GÜVENLİ MOD - HARİTA AÇILSIN DİYE)
 // MEKANLARI LİSTELEME API'Sİ (RESİMLİ VE İSİMLİ - FİNAL VERSİYON)
+// MEKANLARI LİSTELEME API'Sİ (DÜZELTİLMİŞ - GEOJSON FORMATLI)
 app.get('/api/places', async (req, res) => {
     try {
-        // ARTIK EMİNİZ: Veritabanında 'first_name' ve 'last_name' var.
-        // Bu ikisini birleştirip 'user_name' yapacağız.
+        // DÜZELTME: 'ST_AsGeoJSON' kullanarak koordinatları haritanın anlayacağı formata çeviriyoruz.
         const result = await pool.query(`
             SELECT places.*, 
+                   ST_AsGeoJSON(places.geom)::json as geometry,
                    CONCAT(users.first_name, ' ', users.last_name) as user_name, 
                    users.profile_pic 
             FROM places 
@@ -52,7 +53,7 @@ app.get('/api/places', async (req, res) => {
         `);
         res.json(result.rows);
     } catch (err) {
-        console.error(err);
+        console.error("API Hatası:", err);
         res.status(500).json({ error: 'Veritabanı hatası' });
     }
 });
