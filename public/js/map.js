@@ -227,35 +227,46 @@ function loadPlaces() {
     fetch('/api/places')
       .then(res => res.json())
       .then(data => {
-        markersLayer.clearLayers(); // Haritadaki eski iğneleri temizle
-        allPlaces = [];
+        markersLayer.clearLayers(); // Haritayı temizle
+        allPlaces = []; // Listeyi sıfırla
         
         data.forEach(place => {
+            // Koordinatlar artık "geometry" içinden geliyor (GeoJSON düzeltmesi)
             const coords = [place.geometry.coordinates[1], place.geometry.coordinates[0]];
             const category = place.type || 'diger';
             const icon = icons[category] || icons['diger'];
 
-            // --- ✨ YENİ: POPUP İÇERİĞİ HAZIRLAMA ---
+            // --- 🖼️ POPUP İÇERİĞİ (RESİM AYARI) ---
             let popupContent = `<div style="width:200px; text-align:left;">`;
-            popupContent += `<strong style="font-size:1.1rem; color:#333;">${place.name}</strong>`;
-            popupContent += `<p style="margin:5px 0; color:#666;">${place.description}</p>`;
             
-            // Eğer veritabanında fotoğraf linki varsa, popup'a ekle
+            // Başlık ve Açıklama
+            popupContent += `<strong style="font-size:1.1rem; color:#333;">${place.name}</strong>`;
+            popupContent += `<p style="margin:5px 0; color:#666; font-size:0.9rem;">${place.description}</p>`;
+            
+            // 👇 BURASI ÖNEMLİ: Eğer resim varsa ekle!
             if (place.media_url) {
-                popupContent += `<img src="${place.media_url}" style="width:100%; height:120px; object-fit:cover; border-radius:5px; margin-top:5px;">`;
+                popupContent += `<img src="${place.media_url}" style="width:100%; height:120px; object-fit:cover; border-radius:5px; margin-top:8px; border:1px solid #eee;">`;
             }
+            
+            // Yapan Kişi Bilgisi (Opsiyonel, şık durur)
+            if (place.user_name) {
+                popupContent += `<div style="font-size:0.8rem; color:#999; margin-top:5px; text-align:right;">- ${place.user_name}</div>`;
+            }
+            
             popupContent += `</div>`;
             // ----------------------------------------
 
+            // Markeri oluştur ve popup'ı bağla
             const marker = L.marker(coords, { icon: icon })
-                .bindPopup(popupContent); // Hazırladığımız resimli içeriği buraya veriyoruz
+                .bindPopup(popupContent);
             
-            markersLayer.addLayer(marker); // Kümeye ekle
+            markersLayer.addLayer(marker);
             allPlaces.push({ ...place, marker: marker, category: category });
         });
         
-        renderFeed(allPlaces);
-      });
+        renderFeed(allPlaces); // Sol listeyi de güncelle
+      })
+      .catch(err => console.error("Veri çekme hatası:", err));
 }
 
 function filterFeed(category, btn) {
