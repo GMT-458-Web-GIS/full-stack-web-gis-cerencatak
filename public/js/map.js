@@ -218,19 +218,33 @@ function loadPlaces() {
     fetch('/api/places')
       .then(res => res.json())
       .then(data => {
-        markersLayer.clearLayers();
+        markersLayer.clearLayers(); // Haritadaki eski iğneleri temizle
         allPlaces = [];
+        
         data.forEach(place => {
             const coords = [place.geometry.coordinates[1], place.geometry.coordinates[0]];
             const category = place.type || 'diger';
             const icon = icons[category] || icons['diger'];
-            const marker = L.marker(coords, { icon: icon })
-                .bindPopup(`<b>${place.name}</b><br>${place.description}`);
+
+            // --- ✨ YENİ: POPUP İÇERİĞİ HAZIRLAMA ---
+            let popupContent = `<div style="width:200px; text-align:left;">`;
+            popupContent += `<strong style="font-size:1.1rem; color:#333;">${place.name}</strong>`;
+            popupContent += `<p style="margin:5px 0; color:#666;">${place.description}</p>`;
             
-            // Marker'ı kümeye ekle (Doğrudan haritaya değil)
-            markersLayer.addLayer(marker);
+            // Eğer veritabanında fotoğraf linki varsa, popup'a ekle
+            if (place.media_url) {
+                popupContent += `<img src="${place.media_url}" style="width:100%; height:120px; object-fit:cover; border-radius:5px; margin-top:5px;">`;
+            }
+            popupContent += `</div>`;
+            // ----------------------------------------
+
+            const marker = L.marker(coords, { icon: icon })
+                .bindPopup(popupContent); // Hazırladığımız resimli içeriği buraya veriyoruz
+            
+            markersLayer.addLayer(marker); // Kümeye ekle
             allPlaces.push({ ...place, marker: marker, category: category });
         });
+        
         renderFeed(allPlaces);
       });
 }
