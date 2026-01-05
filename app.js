@@ -42,8 +42,8 @@ const upload = multer({ dest: 'public/uploads/' });
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-        user: 'cerencatak@hacettepe.edu.tr', // 👈 Buraya kendi Gmail adresini yaz
-        pass: 'viin ubqw nnxi copv'           // 👈 Buraya aldığın 16 haneli UYGULAMA ŞİFRESİNİ yaz
+        user: 'cerencatak00@gmail.com', // 👈 Buraya kendi Gmail adresini yaz
+        pass: 'nizj aflh qktp bdxg'           // 👈 Buraya aldığın 16 haneli UYGULAMA ŞİFRESİNİ yaz
     }
 });
 // ==========================================
