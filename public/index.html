@@ -77,6 +77,11 @@
                 <form id="loginForm">
                     <input type="text" name="loginId" placeholder="E-posta veya ID" required class="input-clean">
                     <input type="password" name="password" placeholder="Şifre" required class="input-clean">
+                    
+                    <div style="text-align:right; margin-bottom:15px;">
+                        <a href="/forgot-password.html" style="color:#c0392b; text-decoration:none; font-size:0.9rem;">Şifremi Unuttum?</a>
+                    </div>
+
                     <button type="submit" class="btn-full-primary">Giriş Yap</button>
                     <p class="form-note">Hesabın yok mu? <a href="#" onclick="showPanel('registerPanel')">Kayıt Ol</a></p>
                 </form>
@@ -190,6 +195,6 @@
     
     <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
     
-    <script src="/js/map.js?v=5"></script>
+    <script src="/js/map.js?v=6"></script>
 </body>
 </html>

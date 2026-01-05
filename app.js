@@ -4,16 +4,17 @@ const multer = require('multer');
 const fs = require('fs');
 const bcrypt = require('bcryptjs'); 
 const session = require('express-session');
+const crypto = require('crypto'); // Rastgele token üretmek için
 const pool = require('./config/db');
 
-// --- SWAGGER (JSON YÖNTEMİ) ---
+// --- SWAGGER ---
 const swaggerUi = require('swagger-ui-express');
-const swaggerDocument = require('./swagger.json'); 
+const swaggerDocument = require('./swagger.json');
 
 const app = express();
 const port = 3000;
 
-// Swagger Sayfasını Başlat
+// Swagger
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // --- ARA YAZILIMLAR ---
@@ -36,12 +37,9 @@ const upload = multer({ dest: 'public/uploads/' });
 
 // --- ROTALAR ---
 
-// MEKANLARI LİSTELEME API'Sİ (GÜVENLİ MOD - HARİTA AÇILSIN DİYE)
-// MEKANLARI LİSTELEME API'Sİ (RESİMLİ VE İSİMLİ - FİNAL VERSİYON)
-// MEKANLARI LİSTELEME API'Sİ (DÜZELTİLMİŞ - GEOJSON FORMATLI)
+// 1. MEKANLARI LİSTELE (GeoJSON + Resimler + Profil)
 app.get('/api/places', async (req, res) => {
     try {
-        // DÜZELTME: 'ST_AsGeoJSON' kullanarak koordinatları haritanın anlayacağı formata çeviriyoruz.
         const result = await pool.query(`
             SELECT places.*, 
                    ST_AsGeoJSON(places.geom)::json as geometry,
@@ -58,7 +56,7 @@ app.get('/api/places', async (req, res) => {
     }
 });
 
-// Yeni mekan ekle
+// 2. YENİ MEKAN EKLE
 app.post('/api/places', upload.single('mediaFile'), async (req, res) => {
     const { name, description, lat, lng, category } = req.body;
     const mediaUrl = req.file ? `/uploads/${req.file.filename}` : null;
@@ -77,7 +75,7 @@ app.post('/api/places', upload.single('mediaFile'), async (req, res) => {
     }
 });
 
-// Mekan sil
+// 3. MEKAN SİL
 app.delete('/api/places/:id', async (req, res) => {
     const placeId = req.params.id;
     const userId = req.session.userId;
@@ -98,32 +96,7 @@ app.delete('/api/places/:id', async (req, res) => {
     }
 });
 
-// Mekan güncelle
-app.put('/api/places/:id', upload.none(), async (req, res) => {
-    const placeId = req.params.id;
-    const { name, description, category } = req.body;
-    const userId = req.session.userId;
-    const isAdmin = req.session.isAdmin;
-    if (!userId) return res.status(401).json({ success: false, error: "Oturum kapalı." });
-    try {
-        const checkQuery = await pool.query("SELECT user_id FROM places WHERE id = $1", [placeId]);
-        if (checkQuery.rows.length === 0) return res.status(404).json({ success: false });
-        const postOwnerId = checkQuery.rows[0].user_id;
-        if (isAdmin || postOwnerId === userId) {
-            await pool.query(
-                "UPDATE places SET name = $1, description = $2, type = $3 WHERE id = $4",
-                [name, description, category, placeId]
-            );
-            res.json({ success: true });
-        } else {
-            res.status(403).json({ success: false });
-        }
-    } catch (err) {
-        res.status(500).json({ success: false });
-    }
-});
-
-// Kayıt Ol
+// 4. KAYIT OL
 app.post('/api/register', upload.single('profilePic'), async (req, res) => {
     const { firstName, lastName, studentId, email, password } = req.body;
     const profilePic = req.file ? `/uploads/${req.file.filename}` : null;
@@ -142,7 +115,7 @@ app.post('/api/register', upload.single('profilePic'), async (req, res) => {
     }
 });
 
-// Giriş Yap
+// 5. GİRİŞ YAP
 app.post('/api/login', async (req, res) => {
     const { loginId, password } = req.body;
     try {
@@ -160,6 +133,68 @@ app.post('/api/login', async (req, res) => {
             res.status(401).json({ success: false, error: "Şifre hatalı." });
         }
     } catch (err) {
+        res.status(500).json({ success: false });
+    }
+});
+
+// 6. ŞİFREMİ UNUTTUM (TERMİNAL YÖNTEMİ)
+app.post('/api/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    try {
+        // Kullanıcı var mı?
+        const userCheck = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+        if (userCheck.rows.length === 0) {
+            // Güvenlik için "kullanıcı yok" demek yerine "gönderildi" diyoruz
+            return res.json({ success: true, message: "Eğer kayıtlıysa, link gönderildi!" });
+        }
+
+        // Token oluştur
+        const token = crypto.randomBytes(20).toString('hex');
+        const expireTime = new Date(Date.now() + 3600000); // 1 saat geçerli
+
+        // Token'ı DB'ye kaydet
+        await pool.query("UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE email = $3", [token, expireTime, email]);
+
+        // --- LİNKİ TERMİNALE YAZ ---
+        // Burası sihirli kısım!
+        const resetLink = `http://63.177.100.32:3000/reset-password.html?token=${token}`;
+        console.log("---------------------------------------------------");
+        console.log("📧 [SAHTE MAIL SİSTEMİ] Şifre Sıfırlama Linki:");
+        console.log(resetLink);
+        console.log("---------------------------------------------------");
+
+        res.json({ success: true, message: "Link gönderildi! (Terminali kontrol et)" });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, error: "Sunucu hatası" });
+    }
+});
+
+// 7. ŞİFREYİ SIFIRLA (DB GÜNCELLEME)
+app.post('/api/reset-password', async (req, res) => {
+    const { token, newPassword } = req.body;
+    try {
+        // Token geçerli mi?
+        const result = await pool.query("SELECT * FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()", [token]);
+        
+        if (result.rows.length === 0) {
+            return res.status(400).json({ success: false, error: "Link geçersiz veya süresi dolmuş." });
+        }
+
+        const user = result.rows[0];
+        
+        // Yeni şifreyi hashle
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        // Şifreyi güncelle ve token'ı sil
+        await pool.query("UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL WHERE id = $2", [hashedPassword, user.id]);
+
+        res.json({ success: true });
+
+    } catch (err) {
+        console.error(err);
         res.status(500).json({ success: false });
     }
 });
@@ -182,21 +217,9 @@ app.post('/api/update-avatar', upload.single('profilePic'), async (req, res) => 
 
 app.get('/api/logout', (req, res) => { req.session.destroy(); res.json({ success: true }); });
 
+// Eski gönderileri temizle
 setInterval(async () => {
     await pool.query("DELETE FROM places WHERE created_at < NOW() - INTERVAL '24 hours'");
 }, 60 * 60 * 1000);
-
-app.post('/api/comments', async (req, res) => {
-    const { placeId, text } = req.body;
-    const userId = req.session.userId;
-    if (!userId) return res.status(401).json({ success: false });
-    if (!text || text.trim() === "") return res.status(400).json({ success: false });
-    try {
-        await pool.query("INSERT INTO comments (place_id, user_id, comment_text) VALUES ($1, $2, $3)", [placeId, userId, text]);
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ success: false });
-    }
-});
 
 app.listen(port, () => console.log(`Sunucu http://localhost:${port} adresinde hazır!`));
