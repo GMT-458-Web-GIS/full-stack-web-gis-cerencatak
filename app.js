@@ -43,7 +43,7 @@ const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
         user: 'cerencatak00@gmail.com', // 👈 Buraya kendi Gmail adresini yaz
-        pass: 'nizj aflh qktp bdxg'           // 👈 Buraya aldığın 16 haneli UYGULAMA ŞİFRESİNİ yaz
+        pass: 'nizjaflhqktpbdxg'           // 👈 Buraya aldığın 16 haneli UYGULAMA ŞİFRESİNİ yaz
     }
 });
 // ==========================================
