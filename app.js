@@ -4,7 +4,8 @@ const multer = require('multer');
 const fs = require('fs');
 const bcrypt = require('bcryptjs'); 
 const session = require('express-session');
-const crypto = require('crypto'); // Rastgele token üretmek için
+const crypto = require('crypto');
+const nodemailer = require('nodemailer'); // Mail kütüphanesi
 const pool = require('./config/db');
 
 // --- SWAGGER ---
@@ -35,9 +36,22 @@ const uploadDir = path.join(__dirname, 'public/uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 const upload = multer({ dest: 'public/uploads/' });
 
+// ==========================================
+// 👇 MAİL AYARLARI  👇
+// ==========================================
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: 'cerencatak@hacettepe.edu.tr', // 👈 Buraya kendi Gmail adresini yaz
+        pass: 'viin ubqw nnxi copv'           // 👈 Buraya aldığın 16 haneli UYGULAMA ŞİFRESİNİ yaz
+    }
+});
+// ==========================================
+
+
 // --- ROTALAR ---
 
-// 1. MEKANLARI LİSTELE (GeoJSON + Resimler + Profil)
+// 1. MEKANLARI LİSTELE
 app.get('/api/places', async (req, res) => {
     try {
         const result = await pool.query(`
@@ -137,45 +151,50 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// 6. ŞİFREMİ UNUTTUM (TERMİNAL YÖNTEMİ)
+// 6. ŞİFREMİ UNUTTUM (GERÇEK MAİL GÖNDERME 📨)
 app.post('/api/forgot-password', async (req, res) => {
     const { email } = req.body;
     try {
-        // Kullanıcı var mı?
         const userCheck = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
         if (userCheck.rows.length === 0) {
-            // Güvenlik için "kullanıcı yok" demek yerine "gönderildi" diyoruz
             return res.json({ success: true, message: "Eğer kayıtlıysa, link gönderildi!" });
         }
 
-        // Token oluştur
         const token = crypto.randomBytes(20).toString('hex');
-        const expireTime = new Date(Date.now() + 3600000); // 1 saat geçerli
+        const expireTime = new Date(Date.now() + 3600000); // 1 saat
 
-        // Token'ı DB'ye kaydet
         await pool.query("UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE email = $3", [token, expireTime, email]);
 
-        // --- LİNKİ TERMİNALE YAZ ---
-        // Burası sihirli kısım!
         const resetLink = `http://63.177.100.32:3000/reset-password.html?token=${token}`;
-        console.log("---------------------------------------------------");
-        console.log("📧 [SAHTE MAIL SİSTEMİ] Şifre Sıfırlama Linki:");
-        console.log(resetLink);
-        console.log("---------------------------------------------------");
 
-        res.json({ success: true, message: "Link gönderildi! (Terminali kontrol et)" });
+        const mailOptions = {
+            from: '"Hacettepe Social" <no-reply@hacettepesocial.com>',
+            to: email,
+            subject: '🔒 Şifre Sıfırlama İsteği',
+            html: `
+                <h3>Merhaba!</h3>
+                <p>Şifreni sıfırlamak için aşağıdaki butona tıkla:</p>
+                <a href="${resetLink}" style="background-color:#c0392b; color:white; padding:10px 20px; text-decoration:none; border-radius:5px;">Şifremi Sıfırla</a>
+                <p>veya linki kopyala: ${resetLink}</p>
+                <p>Bu isteği sen yapmadıysan, dikkate alma.</p>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log("✅ Mail başarıyla gönderildi: " + email);
+
+        res.json({ success: true, message: "Sıfırlama linki e-postana gönderildi!" });
 
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, error: "Sunucu hatası" });
+        console.error("Mail Hatası:", err);
+        res.status(500).json({ success: false, error: "Mail gönderilemedi (Ayarları kontrol et)" });
     }
 });
 
-// 7. ŞİFREYİ SIFIRLA (DB GÜNCELLEME)
+// 7. ŞİFREYİ SIFIRLA
 app.post('/api/reset-password', async (req, res) => {
     const { token, newPassword } = req.body;
     try {
-        // Token geçerli mi?
         const result = await pool.query("SELECT * FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()", [token]);
         
         if (result.rows.length === 0) {
@@ -183,12 +202,9 @@ app.post('/api/reset-password', async (req, res) => {
         }
 
         const user = result.rows[0];
-        
-        // Yeni şifreyi hashle
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-        // Şifreyi güncelle ve token'ı sil
         await pool.query("UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL WHERE id = $2", [hashedPassword, user.id]);
 
         res.json({ success: true });
@@ -217,7 +233,6 @@ app.post('/api/update-avatar', upload.single('profilePic'), async (req, res) => 
 
 app.get('/api/logout', (req, res) => { req.session.destroy(); res.json({ success: true }); });
 
-// Eski gönderileri temizle
 setInterval(async () => {
     await pool.query("DELETE FROM places WHERE created_at < NOW() - INTERVAL '24 hours'");
 }, 60 * 60 * 1000);
