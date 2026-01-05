@@ -2,7 +2,12 @@
 var map = L.map('map').setView([39.8667, 32.7347], 15);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
 
-var markersLayer = L.layerGroup().addTo(map);
+// ✅ DÜZELTME: Artık LayerGroup yerine MarkerClusterGroup kullanıyoruz!
+var markersLayer = L.markerClusterGroup({
+    showCoverageOnHover: false, // Üzerine gelince mavi alanı gösterme (daha temiz)
+    zoomToBoundsOnClick: true   // Tıklayınca kümenin içine zoom yap
+}).addTo(map);
+
 var allPlaces = []; 
 let currentUser = null; 
 let editingPlaceId = null; 
@@ -122,8 +127,21 @@ function renderFeed(places) {
         
         card.addEventListener('click', (e) => {
             if (!e.target.closest('.btn-action') && !e.target.closest('.comment-form') && !e.target.tagName.match(/INPUT|BUTTON/)) {
+                // Eğer cluster içindeyse zoom yap, değilse direkt git
                 map.flyTo([place.geometry.coordinates[1], place.geometry.coordinates[0]], 17);
-                place.marker.openPopup();
+                
+                // Marker'ı bulup popup aç (Cluster içindeyse bu biraz zordur ama zoom yapınca görünür olur)
+                // Kümeyi açmak için biraz bekleme süresi
+                setTimeout(() => {
+                    if(map.hasLayer(place.marker)) {
+                        place.marker.openPopup();
+                    } else {
+                        // Eğer hala küme içindeyse, kümeyi açmaya zorla
+                        markersLayer.zoomToShowLayer(place.marker, () => {
+                            place.marker.openPopup();
+                        });
+                    }
+                }, 500);
             }
         });
 
@@ -208,6 +226,8 @@ function loadPlaces() {
             const icon = icons[category] || icons['diger'];
             const marker = L.marker(coords, { icon: icon })
                 .bindPopup(`<b>${place.name}</b><br>${place.description}`);
+            
+            // Marker'ı kümeye ekle (Doğrudan haritaya değil)
             markersLayer.addLayer(marker);
             allPlaces.push({ ...place, marker: marker, category: category });
         });
@@ -218,9 +238,11 @@ function loadPlaces() {
 function filterFeed(category, btn) {
     document.querySelectorAll('.story-item').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    markersLayer.clearLayers();
+    
+    markersLayer.clearLayers(); // Kümeyi temizle
+    
     const filtered = category === 'all' ? allPlaces : allPlaces.filter(p => p.category === category);
-    filtered.forEach(p => markersLayer.addLayer(p.marker));
+    filtered.forEach(p => markersLayer.addLayer(p.marker)); // Filtrelenenleri kümeye ekle
     renderFeed(filtered);
 }
 
@@ -312,7 +334,6 @@ if(avatarInput) {
     });
 }
 
-// ✅ DÜZELTİLEN KISIM: Profil resmi hem sağ üstte hem de gönderi kutusunda değişecek
 function updateUserStatus(loggedIn, userData) {
     const container = document.getElementById('userStatus');
     const placeholderImg = document.getElementById('userAvatarPlaceholder'); 
