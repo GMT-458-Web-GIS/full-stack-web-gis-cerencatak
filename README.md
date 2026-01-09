@@ -107,6 +107,8 @@ DELETE /api/places/:id
 
 /api-docs
 
+![alt text](<Ekran görüntüsü 2026-01-10 003948.png>)
+
 ---
 
 ## 5. Managing Different User Types
